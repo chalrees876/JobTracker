@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Profile
+// ============================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile      UserProfile?
+  applications Application[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  headline        String?
+  targetRoles     String[] @default([])
+  targetLocations String[] @default([])
+  baseResume      Json?    // ResumeData stored as JSON
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ============================================
+// Applications
+// ============================================
+
+model Application {
+  id              String            @id @default(cuid())
+  userId          String
+  companyName     String
+  title           String
+  location        String?
+  url             String
+  description     String            @db.Text
+  descriptionHash String            // For detecting duplicate/changed JDs
+  salary          String?
+  source          String?           // linkedin, greenhouse, lever, etc.
+  status          ApplicationStatus @default(SAVED)
+  notes           String?           @db.Text
+  appliedAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumeVersions ResumeVersion[]
+  contacts       Contact[]
+  companyInfo    CompanyInfo?
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  SAVED
+  APPLIED
+  PHONE_SCREEN
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+// ============================================
+// Resume Versions
+// ============================================
+
+model ResumeVersion {
+  id            String   @id @default(cuid())
+  applicationId String
+  content       Json     // ResumeData JSON - the tailored resume content
+  keywords      String[] @default([])
+  pdfFileId     String?  // S3 key if we generate a PDF
+  promptConfig  Json?    // What rules/prompts were used to generate this
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("resume_versions")
+}
+
+// ============================================
+// Contacts & Outreach
+// ============================================
+
+model Contact {
+  id            String            @id @default(cuid())
+  applicationId String
+  name          String
+  role          String?
+  email         String?
+  linkedinUrl   String?
+  confidence    ContactConfidence @default(LOW)
+  source        String?           // How we found them
+  notes         String?
+  createdAt     DateTime          @default(now())
+
+  application      Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  outreachMessages OutreachMessage[]
+
+  @@index([applicationId])
+  @@map("contacts")
+}
+
+enum ContactConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model OutreachMessage {
+  id        String          @id @default(cuid())
+  contactId String
+  subject   String?
+  body      String          @db.Text
+  channel   OutreachChannel
+  createdAt DateTime        @default(now())
+  sentAt    DateTime?
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("outreach_messages")
+}
+
+enum OutreachChannel {
+  EMAIL
+  LINKEDIN
+}
+
+// ============================================
+// Company Research
+// ============================================
+
+model CompanyInfo {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  summary       String?  @db.Text
+  product       String?
+  industry      String?
+  size          String?
+  talkingPoints String[] @default([])
+  interviewPrep String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("company_info")
+}
