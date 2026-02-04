@@ -1,0 +1,28 @@
+{
+  "name": "job-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma",
+      "sharp"
+    ]
+  },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "build:extension": "pnpm --filter extension build",
+    "db:generate": "pnpm --filter web prisma generate",
+    "db:push": "pnpm --filter web prisma db push",
+    "db:studio": "pnpm --filter web prisma studio",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
