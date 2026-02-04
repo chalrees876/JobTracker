@@ -2,8 +2,20 @@
 
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { useState } from "react";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export default function LoginPage() {
+  const [devEmail, setDevEmail] = useState("dev@example.com");
+  const [loading, setLoading] = useState(false);
+
+  const handleDevLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    await signIn("dev-login", { email: devEmail, callbackUrl: "/applications" });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted">
       <div className="w-full max-w-md p-8">
@@ -17,6 +29,40 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-card border rounded-lg p-6 space-y-4">
+          {/* Dev login - only shown in development */}
+          {isDev && (
+            <>
+              <form onSubmit={handleDevLogin} className="space-y-3">
+                <div className="text-xs text-muted-foreground text-center bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                  Development Mode
+                </div>
+                <input
+                  type="email"
+                  value={devEmail}
+                  onChange={(e) => setDevEmail(e.target.value)}
+                  placeholder="dev@example.com"
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-primary text-primary-foreground px-4 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Signing in..." : "Dev Login"}
+                </button>
+              </form>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+            </>
+          )}
+
           <button
             onClick={() => signIn("google", { callbackUrl: "/applications" })}
             className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-50 transition-colors"
