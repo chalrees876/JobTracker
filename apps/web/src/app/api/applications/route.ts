@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createApplicationSchema, type ApiResponse, type Application } from "@shared/types";
+import { auth } from "@/lib/auth";
+import { createApplicationSchema } from "@shared/types";
 import crypto from "crypto";
-
-// Temporary: hardcode user ID until auth is added
-const TEMP_USER_ID = "temp-user-id";
 
 // GET /api/applications - List all applications
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") ?? "1");
     const pageSize = parseInt(searchParams.get("pageSize") ?? "50");
 
     const where = {
-      userId: TEMP_USER_ID,
+      userId: session.user.id,
       ...(status ? { status: status as any } : {}),
     };
 
@@ -61,6 +67,14 @@ export async function GET(request: NextRequest) {
 // POST /api/applications - Create new application
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const parsed = createApplicationSchema.safeParse(body);
 
@@ -83,7 +97,7 @@ export async function POST(request: NextRequest) {
     // Check for existing application with same URL
     const existing = await db.application.findFirst({
       where: {
-        userId: TEMP_USER_ID,
+        userId: session.user.id,
         url,
       },
     });
@@ -95,16 +109,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure user exists (temporary - will be handled by auth later)
-    await db.user.upsert({
-      where: { id: TEMP_USER_ID },
-      create: { id: TEMP_USER_ID, email: "temp@example.com" },
-      update: {},
-    });
-
     const application = await db.application.create({
       data: {
-        userId: TEMP_USER_ID,
+        userId: session.user.id,
         companyName,
         title,
         location,

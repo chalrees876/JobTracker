@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { ResumeData } from "@shared/types";
-
-const TEMP_USER_ID = "temp-user-id";
 
 const tailoredResumeSchema = z.object({
   summary: z.string().describe("A 2-3 sentence professional summary tailored to the job"),
@@ -38,11 +37,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     // Get application with job description
     const application = await db.application.findFirst({
-      where: { id, userId: TEMP_USER_ID },
+      where: { id, userId: session.user.id },
     });
 
     if (!application) {
@@ -54,7 +61,7 @@ export async function POST(
 
     // Get user's base resume
     const profile = await db.userProfile.findFirst({
-      where: { userId: TEMP_USER_ID },
+      where: { userId: session.user.id },
     });
 
     if (!profile?.baseResume) {
@@ -148,12 +155,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     const versions = await db.resumeVersion.findMany({
       where: {
         applicationId: id,
-        application: { userId: TEMP_USER_ID },
+        application: { userId: session.user.id },
       },
       orderBy: { createdAt: "desc" },
     });

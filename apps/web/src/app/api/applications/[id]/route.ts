@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const TEMP_USER_ID = "temp-user-id";
+import { auth } from "@/lib/auth";
 
 // GET /api/applications/[id] - Get single application
 export async function GET(
@@ -9,12 +8,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     const application = await db.application.findFirst({
       where: {
         id,
-        userId: TEMP_USER_ID,
+        userId: session.user.id,
       },
       include: {
         resumeVersions: {
@@ -52,12 +59,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
     // Verify ownership
     const existing = await db.application.findFirst({
-      where: { id, userId: TEMP_USER_ID },
+      where: { id, userId: session.user.id },
     });
 
     if (!existing) {
@@ -94,11 +109,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     // Verify ownership
     const existing = await db.application.findFirst({
-      where: { id, userId: TEMP_USER_ID },
+      where: { id, userId: session.user.id },
     });
 
     if (!existing) {
