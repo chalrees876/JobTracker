@@ -78,13 +78,34 @@ model UserProfile {
   headline        String?
   targetRoles     String[] @default([])
   targetLocations String[] @default([])
-  baseResume      Json?    // ResumeData stored as JSON
+  onboardingComplete Boolean @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseResumes BaseResume[]
 
   @@map("user_profiles")
+}
+
+// ============================================
+// Base Resumes (user's source resumes)
+// ============================================
+
+model BaseResume {
+  id          String   @id @default(cuid())
+  profileId   String
+  name        String   // e.g., "Software Engineer", "Frontend Developer", "General"
+  content     Json     // ResumeData JSON - the user's actual resume
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile         UserProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  resumeVersions  ResumeVersion[]
+
+  @@index([profileId])
+  @@map("base_resumes")
 }
 
 // ============================================
@@ -135,6 +156,7 @@ enum ApplicationStatus {
 model ResumeVersion {
   id            String   @id @default(cuid())
   applicationId String
+  baseResumeId  String?  // Which base resume this was generated from
   content       Json     // ResumeData JSON - the tailored resume content
   keywords      String[] @default([])
   pdfFileId     String?  // S3 key if we generate a PDF
@@ -142,8 +164,10 @@ model ResumeVersion {
   createdAt     DateTime @default(now())
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  baseResume  BaseResume? @relation(fields: [baseResumeId], references: [id], onDelete: SetNull)
 
   @@index([applicationId])
+  @@index([baseResumeId])
   @@map("resume_versions")
 }
 

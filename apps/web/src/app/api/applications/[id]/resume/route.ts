@@ -46,6 +46,8 @@ export async function POST(
     }
 
     const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const { baseResumeId } = body;
 
     // Get application with job description
     const application = await db.application.findFirst({
@@ -59,19 +61,32 @@ export async function POST(
       );
     }
 
-    // Get user's base resume
+    // Get user's profile
     const profile = await db.userProfile.findFirst({
       where: { userId: session.user.id },
+      include: { baseResumes: true },
     });
 
-    if (!profile?.baseResume) {
+    if (!profile || profile.baseResumes.length === 0) {
       return NextResponse.json(
-        { success: false, error: "No base resume found. Please upload your resume first." },
+        { success: false, error: "No base resume found. Please add a resume in your profile first." },
         { status: 400 }
       );
     }
 
-    const baseResume = profile.baseResume as ResumeData;
+    // Find the specified base resume, or use the default
+    let selectedResume = baseResumeId
+      ? profile.baseResumes.find((r) => r.id === baseResumeId)
+      : profile.baseResumes.find((r) => r.isDefault) || profile.baseResumes[0];
+
+    if (!selectedResume) {
+      return NextResponse.json(
+        { success: false, error: "Selected resume not found" },
+        { status: 400 }
+      );
+    }
+
+    const baseResume = selectedResume.content as ResumeData;
 
     // Generate tailored resume using AI
     const { object: tailored } = await generateObject({
@@ -122,10 +137,12 @@ Generate a tailored resume that will perform well in ATS systems while remaining
     const resumeVersion = await db.resumeVersion.create({
       data: {
         applicationId: id,
+        baseResumeId: selectedResume.id,
         content: tailoredResume,
         keywords: tailored.keywords,
         promptConfig: {
           model: "gpt-4o",
+          baseResumeId: selectedResume.id,
           timestamp: new Date().toISOString(),
         },
       },
@@ -171,6 +188,11 @@ export async function GET(
         application: { userId: session.user.id },
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        baseResume: {
+          select: { name: true },
+        },
+      },
     });
 
     return NextResponse.json({ success: true, data: versions });

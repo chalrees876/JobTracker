@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -50,13 +51,38 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ApplicationsPage() {
+  const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
-    fetchApplications();
+    checkProfileAndFetch();
   }, []);
+
+  async function checkProfileAndFetch() {
+    try {
+      // Check if user has any resumes
+      const profileRes = await fetch("/api/profile");
+      const profileData = await profileRes.json();
+
+      if (profileData.success) {
+        const hasResumes = profileData.data.baseResumes?.length > 0;
+        if (!hasResumes) {
+          setNeedsOnboarding(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fetch applications
+      await fetchApplications();
+    } catch (error) {
+      console.error("Failed to check profile:", error);
+      setLoading(false);
+    }
+  }
 
   async function fetchApplications() {
     try {
@@ -116,7 +142,37 @@ export default function ApplicationsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading applications...</div>
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (needsOnboarding) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto px-4 py-4">
+            <Link href="/" className="text-2xl font-bold text-primary">
+              JobTracker
+            </Link>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-16 text-center max-w-xl">
+          <div className="bg-card border rounded-lg p-8">
+            <FileText className="w-16 h-16 text-primary mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-2">Welcome to JobTracker!</h1>
+            <p className="text-muted-foreground mb-6">
+              Before you can start applying to jobs, you need to add your base resume.
+              We'll use this to generate tailored resumes for each application.
+            </p>
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              Set Up Your Profile
+            </Link>
+          </div>
+        </main>
       </div>
     );
   }
@@ -170,6 +226,13 @@ export default function ApplicationsPage() {
                 List
               </button>
             </div>
+            <Link
+              href="/applications/new"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Application
+            </Link>
           </div>
         </div>
       </header>
