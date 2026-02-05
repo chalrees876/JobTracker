@@ -64,47 +64,74 @@ export default function NewApplicationPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function createApplication() {
+    const appRes = await fetch("/api/applications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName,
+        title,
+        url: url || `https://example.com/jobs/${Date.now()}`,
+        description,
+      }),
+    });
+
+    const appData = await appRes.json();
+    if (!appRes.ok) throw new Error(appData.error || "Failed to create application");
+
+    return appData.data.id as string;
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!selectedResumeId) {
-      setError("Please select a resume to tailor");
-      return;
-    }
+
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const action = submitter?.value; // "mark_applied" | "generate_resume"
 
     setError("");
-    setStep("generating");
 
     try {
-      // 1. Create the application
-      const appRes = await fetch("/api/applications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName,
-          title,
-          url: url || `https://example.com/jobs/${Date.now()}`, // Placeholder if no URL
-          description,
-        }),
-      });
+      // Always create the application first (both scenarios need it)
+      const appId = await createApplication();
+      setApplicationId(appId);
 
-      const appData = await appRes.json();
-      if (!appRes.ok) {
-        throw new Error(appData.error || "Failed to create application");
+      // Scenario A: Mark Applied -> update status + redirect, DONE
+      if (action === "mark_applied") {
+        await fetch(`/api/applications/${appId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "APPLIED",
+            appliedAt: new Date().toISOString(),
+            appliedWithResumeId: selectedResumeId || null,
+          }),
+        });
+
+        router.push("/applications");
+        return;
       }
 
-      setApplicationId(appData.data.id);
+      // Scenario B: Generate Resume -> require resume selection and job description
+      if (!selectedResumeId) {
+        setError("Please select a resume to tailor");
+        return;
+      }
 
-      // 2. Generate tailored resume
-      const resumeRes = await fetch(`/api/applications/${appData.data.id}/resume`, {
+      if (!description.trim()) {
+        setError("Job description is required to generate a tailored resume");
+        return;
+      }
+
+      setStep("generating");
+
+      const resumeRes = await fetch(`/api/applications/${appId}/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ baseResumeId: selectedResumeId }),
       });
 
       const resumeData = await resumeRes.json();
-      if (!resumeRes.ok) {
-        throw new Error(resumeData.error || "Failed to generate resume");
-      }
+      if (!resumeRes.ok) throw new Error(resumeData.error || "Failed to generate resume");
 
       setGeneratedResume(resumeData.data);
       setStep("review");
@@ -122,6 +149,7 @@ export default function NewApplicationPage() {
         body: JSON.stringify({
           status: "APPLIED",
           appliedAt: new Date().toISOString(),
+          appliedWithResumeId: selectedResumeId || null,
         }),
       });
       router.push("/applications");
@@ -134,33 +162,6 @@ export default function NewApplicationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  if (baseResumes.length === 0) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-background/95 backdrop-blur">
-          <div className="container mx-auto px-4 py-4">
-            <Link href="/" className="text-2xl font-bold text-primary">
-              JobTracker
-            </Link>
-          </div>
-        </header>
-        <main className="container mx-auto px-4 py-16 text-center">
-          <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">No Resume Found</h1>
-          <p className="text-muted-foreground mb-6">
-            You need to add a base resume before you can generate tailored versions.
-          </p>
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium"
-          >
-            Go to Profile
-          </Link>
-        </main>
       </div>
     );
   }
@@ -234,67 +235,102 @@ export default function NewApplicationPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Job Description *
+                  Job Description
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={10}
-                  placeholder="Paste the full job description here..."
+                  rows={8}
+                  placeholder="Paste the full job description here (optional for tracking, required for resume generation)..."
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                  required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  We'll extract keywords and requirements to tailor your resume
+                  Optional for tracking. Required if you want to generate a tailored resume.
                 </p>
               </div>
             </div>
 
-            {/* Resume Selection */}
-            <div className="bg-card border rounded-lg p-6 space-y-4">
-              <h2 className="font-semibold">Select Resume to Tailor</h2>
+            {/* Resume Selection - only show if user has resumes */}
+            {baseResumes.length > 0 && (
+              <div className="bg-card border rounded-lg p-6 space-y-4">
+                <div>
+                  <h2 className="font-semibold">Resume Used (Optional)</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Select which resume you used to apply, or generate a tailored version.
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                {baseResumes.map((resume) => (
-                  <label
-                    key={resume.id}
-                    className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedResumeId === resume.id
-                        ? "border-primary bg-primary/5"
-                        : "hover:bg-muted"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="resume"
-                      value={resume.id}
-                      checked={selectedResumeId === resume.id}
-                      onChange={(e) => setSelectedResumeId(e.target.value)}
-                      className="w-4 h-4 text-primary"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium">{resume.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {resume.content.skills?.slice(0, 5).join(", ")}
-                        {(resume.content.skills?.length || 0) > 5 && "..."}
+                <div className="space-y-2">
+                  {baseResumes.map((resume) => (
+                    <label
+                      key={resume.id}
+                      className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedResumeId === resume.id
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="resume"
+                        value={resume.id}
+                        checked={selectedResumeId === resume.id}
+                        onChange={(e) => setSelectedResumeId(e.target.value)}
+                        className="w-4 h-4 text-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{resume.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {resume.content.skills?.slice(0, 5).join(", ")}
+                          {(resume.content.skills?.length || 0) > 5 && "..."}
+                        </div>
                       </div>
-                    </div>
-                    {resume.isDefault && (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                        Default
-                      </span>
-                    )}
-                  </label>
-                ))}
+                      {resume.isDefault && (
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <button
-              type="submit"
-              className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-            >
-              Generate Tailored Resume
-            </button>
+            {/* No resumes hint */}
+            {baseResumes.length === 0 && (
+              <div className="bg-muted/50 border border-dashed rounded-lg p-6 text-center">
+                <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No saved resumes yet.{" "}
+                  <Link href="/profile" className="text-primary hover:underline">
+                    Add a resume
+                  </Link>{" "}
+                  to generate tailored versions.
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-4">
+              <button
+                type="submit"
+                name="action"
+                value="mark_applied"
+                className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              >
+                Mark as Applied
+              </button>
+              {baseResumes.length > 0 && (
+                <button
+                  type="submit"
+                  name="action"
+                  value="generate_resume"
+                  className="flex-1 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
+                >
+                  Generate Tailored Resume
+                </button>
+              )}
+            </div>
           </form>
         )}
 

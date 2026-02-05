@@ -26,6 +26,11 @@ export async function GET(
       include: {
         resumeVersions: {
           orderBy: { createdAt: "desc" },
+          include: {
+            baseResume: {
+              select: { name: true },
+            },
+          },
         },
         contacts: {
           include: {
@@ -43,7 +48,23 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: application });
+    // Fetch the base resume used when applying (if any)
+    let appliedWithResume = null;
+    if (application.appliedWithResumeId) {
+      const baseResume = await db.baseResume.findUnique({
+        where: { id: application.appliedWithResumeId },
+        select: { id: true, name: true },
+      });
+      appliedWithResume = baseResume;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...application,
+        appliedWithResume,
+      }
+    });
   } catch (error) {
     console.error("Failed to fetch application:", error);
     return NextResponse.json(
@@ -82,7 +103,7 @@ export async function PATCH(
       );
     }
 
-    const { status, notes, appliedAt } = body;
+    const { status, notes, appliedAt, appliedWithResumeId } = body;
 
     const application = await db.application.update({
       where: { id },
@@ -90,6 +111,7 @@ export async function PATCH(
         ...(status !== undefined && { status }),
         ...(notes !== undefined && { notes }),
         ...(appliedAt !== undefined && { appliedAt: new Date(appliedAt) }),
+        ...(appliedWithResumeId !== undefined && { appliedWithResumeId }),
       },
     });
 
