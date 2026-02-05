@@ -5,6 +5,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 import type { ResumeData } from "@shared/types";
+import type { Prisma } from "@prisma/client";
 
 const tailoredResumeSchema = z.object({
   summary: z.string().describe("A 2-3 sentence professional summary tailored to the job"),
@@ -148,7 +149,7 @@ export async function POST(
       );
     }
 
-    const baseResume = selectedResume.content as ResumeData;
+    const baseResume = selectedResume.content as unknown as ResumeData;
 
     const promptBase = `You are an expert ATS resume optimizer. Given a base resume and job description, create a tailored version that:
 
@@ -173,8 +174,7 @@ Location: ${application.location || "Not specified"}
 
 ${application.description}
 
-Generate a tailored resume that will perform well in ATS systems while remaining completely truthful.`,
-    };
+Generate a tailored resume that will perform well in ATS systems while remaining completely truthful.`;
 
     let tailored: TailoredResume | null = null;
     let validationError = "";
@@ -232,7 +232,7 @@ Generate a tailored resume that will perform well in ATS systems while remaining
       data: {
         applicationId: id,
         baseResumeId: selectedResume.id,
-        content: tailoredResume,
+        content: tailoredResume as unknown as Prisma.InputJsonValue,
         keywords: tailored.keywords,
         promptConfig: {
           model: "gpt-4o",

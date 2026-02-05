@@ -3,11 +3,12 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { writeFile, mkdir } from "fs/promises";
+import { storage } from "@/lib/storage";
 import path from "path";
 import { randomUUID } from "crypto";
 import { parseResumePdf } from "@/lib/resume-parse";
 import type { ResumeData } from "@shared/types";
+import type { Prisma } from "@prisma/client";
 
 // Max file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -71,24 +72,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), "uploads", session.user.id);
-    await mkdir(uploadsDir, { recursive: true });
-
-    // Generate unique filename
+    // Generate unique filename and storage key
     const uniqueId = randomUUID();
     const fileName = `${uniqueId}${ext}`;
-    const filePath = path.join(uploadsDir, fileName);
+    const storageKey = `${session.user.id}/${fileName}`;
 
-    // Write file to disk
+    // Upload file to storage (GCS or local)
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    const contentType = file.type || `application/${ext.slice(1)}`;
+    await storage.upload(storageKey, buffer, contentType);
 
     let parsedContent: ResumeData | null = null;
     if (ext === ".pdf") {
       try {
-        const parsed = await parseResumePdf(buffer, filePath);
+        const parsed = await parseResumePdf(buffer);
         parsedContent = parsed.parsed;
       } catch (error) {
         const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
@@ -121,11 +119,11 @@ export async function POST(request: NextRequest) {
         profileId: profile.id,
         name: name || file.name.replace(/\.[^/.]+$/, ""), // Use provided name or filename without extension
         fileName: file.name,
-        fileType: file.type || `application/${ext.slice(1)}`,
+        fileType: contentType,
         fileSize: file.size,
-        filePath: `${session.user.id}/${fileName}`, // Relative path for storage
+        filePath: storageKey, // Storage key (works for both GCS and local)
         isDefault,
-        content: parsedContent,
+        content: (parsedContent ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
 

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { readFile } from "fs/promises";
-import path from "path";
+import { storage } from "@/lib/storage";
 
 // GET /api/resumes/[id]/file - Download/view a resume file
 export async function GET(
@@ -51,17 +50,23 @@ export async function GET(
       );
     }
 
-    // Read file from disk
-    const filePath = path.join(process.cwd(), "uploads", resume.filePath);
+    const contentType = resume.fileType || "application/octet-stream";
 
+    // Try to get signed URL for GCS, otherwise serve directly for local storage
+    const signedUrl = await storage.getSignedUrl(resume.filePath, {
+      filename: resume.fileName || "resume",
+    });
+
+    if (signedUrl) {
+      // GCS: redirect to signed URL
+      return NextResponse.redirect(signedUrl);
+    }
+
+    // Local storage: serve file directly
     try {
-      const fileBuffer = await readFile(filePath);
+      const fileBuffer = await storage.download(resume.filePath);
 
-      // Determine content type
-      const contentType = resume.fileType || "application/octet-stream";
-
-      // Return file with appropriate headers
-      return new NextResponse(fileBuffer, {
+      return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": contentType,
           "Content-Disposition": `inline; filename="${resume.fileName || "resume"}"`,
@@ -71,7 +76,7 @@ export async function GET(
     } catch (fileError) {
       console.error("Failed to read file:", fileError);
       return NextResponse.json(
-        { success: false, error: "File not found on disk" },
+        { success: false, error: "File not found" },
         { status: 404 }
       );
     }

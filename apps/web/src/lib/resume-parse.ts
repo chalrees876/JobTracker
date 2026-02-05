@@ -2,7 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
+import { unlink, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -65,18 +65,14 @@ function resolvePdfParseCli(): string {
   throw new Error("PDF_PARSE_FAILED");
 }
 
-async function extractPdfText(buffer: Buffer, filePath?: string): Promise<string> {
-  let tempPath: string | undefined;
-  let cleanup = false;
+async function extractPdfText(buffer: Buffer): Promise<string> {
   const cliPath = resolvePdfParseCli();
 
-  if (filePath) {
-    tempPath = filePath;
-  } else {
-    tempPath = path.join(process.cwd(), "uploads", `tmp-${randomUUID()}.pdf`);
-    await writeFile(tempPath, buffer);
-    cleanup = true;
-  }
+  // Create temp file for pdf-parse CLI (always cleanup after)
+  const tempDir = path.join(process.cwd(), "uploads", "tmp");
+  await mkdir(tempDir, { recursive: true });
+  const tempPath = path.join(tempDir, `${randomUUID()}.pdf`);
+  await writeFile(tempPath, buffer);
 
   try {
     const { stdout } = await execFileAsync(
@@ -86,9 +82,7 @@ async function extractPdfText(buffer: Buffer, filePath?: string): Promise<string
     );
     return stdout;
   } finally {
-    if (cleanup && tempPath) {
-      await unlink(tempPath).catch(() => undefined);
-    }
+    await unlink(tempPath).catch(() => undefined);
   }
 }
 
@@ -100,12 +94,11 @@ function makeParseError(code: "PDF_PARSE_FAILED" | "NO_TEXT", cause?: unknown) {
 }
 
 export async function parseResumePdf(
-  buffer: Buffer,
-  filePath?: string
+  buffer: Buffer
 ): Promise<{ parsed: ParsedResume; rawText: string }> {
   let pdfText: string;
   try {
-    pdfText = await extractPdfText(buffer, filePath);
+    pdfText = await extractPdfText(buffer);
   } catch (error) {
     throw makeParseError("PDF_PARSE_FAILED", error);
   }

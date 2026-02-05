@@ -398,7 +398,7 @@ export default function ApplicationDetailPage({
               </div>
 
               {/* External Link */}
-              {hasUrl && (
+              {hasUrl && application.url && (
                 <a
                   href={application.url}
                   target="_blank"
@@ -902,7 +902,7 @@ export default function ApplicationDetailPage({
             <div className="bg-card border rounded-lg p-6 space-y-3">
               <h3 className="font-semibold">Quick Actions</h3>
 
-              {hasUrl && (
+              {hasUrl && application.url && (
                 <a
                   href={application.url}
                   target="_blank"

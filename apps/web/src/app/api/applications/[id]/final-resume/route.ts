@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { writeFile, mkdir, unlink, readFile } from "fs/promises";
+import { storage } from "@/lib/storage";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -11,12 +11,6 @@ import { randomUUID } from "crypto";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 // Allowed file types
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
 const ALLOWED_EXTENSIONS = [".pdf", ".doc", ".docx"];
 
 // POST /api/applications/[id]/final-resume - Upload final resume file
@@ -70,31 +64,29 @@ export async function POST(
       );
     }
 
-    const uploadsDir = path.join(process.cwd(), "uploads", session.user.id, "applications", id);
-    await mkdir(uploadsDir, { recursive: true });
-
+    // Generate unique filename and storage key
     const uniqueId = randomUUID();
     const fileName = `${uniqueId}${ext}`;
-    const filePath = path.join(uploadsDir, fileName);
+    const storageKey = `${session.user.id}/applications/${id}/${fileName}`;
 
+    // Upload file to storage (GCS or local)
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
+    const contentType = file.type || `application/${ext.slice(1)}`;
+    await storage.upload(storageKey, buffer, contentType);
 
     // Clean up old file if present
     if (application.finalResumeFilePath) {
-      const oldPath = path.join(process.cwd(), "uploads", application.finalResumeFilePath);
-      await unlink(oldPath).catch(() => undefined);
+      await storage.delete(application.finalResumeFilePath);
     }
 
-    const storedPath = path.join(session.user.id, "applications", id, fileName);
     const updated = await db.application.update({
       where: { id },
       data: {
         finalResumeFileName: file.name,
-        finalResumeFileType: file.type || `application/${ext.slice(1)}`,
+        finalResumeFileType: contentType,
         finalResumeFileSize: file.size,
-        finalResumeFilePath: storedPath,
+        finalResumeFilePath: storageKey,
         finalResumeUploadedAt: new Date(),
       },
     });
@@ -149,16 +141,36 @@ export async function GET(
       );
     }
 
-    const absolutePath = path.join(process.cwd(), "uploads", application.finalResumeFilePath);
-    const fileBuffer = await readFile(absolutePath);
     const contentType = application.finalResumeFileType || "application/octet-stream";
 
-    return new NextResponse(fileBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${application.finalResumeFileName || "final_resume"}"`,
-      },
+    // Try to get signed URL for GCS, otherwise serve directly for local storage
+    const signedUrl = await storage.getSignedUrl(application.finalResumeFilePath, {
+      filename: application.finalResumeFileName || "final_resume",
     });
+
+    if (signedUrl) {
+      // GCS: redirect to signed URL
+      return NextResponse.redirect(signedUrl);
+    }
+
+    // Local storage: serve file directly
+    try {
+      const fileBuffer = await storage.download(application.finalResumeFilePath);
+
+      return new NextResponse(new Uint8Array(fileBuffer), {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `inline; filename="${application.finalResumeFileName || "final_resume"}"`,
+          "Content-Length": String(fileBuffer.length),
+        },
+      });
+    } catch (fileError) {
+      console.error("Failed to read file:", fileError);
+      return NextResponse.json(
+        { success: false, error: "File not found" },
+        { status: 404 }
+      );
+    }
   } catch (error) {
     console.error("Failed to fetch final resume:", error);
     return NextResponse.json(
