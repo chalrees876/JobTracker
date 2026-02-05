@@ -23,12 +23,13 @@ export function CopyableSection({ title, content, children }: CopyableSectionPro
   }
 
   return (
-    <div className="group relative">
+    <div className="group relative focus:outline-none" tabIndex={0}>
       <div className="flex items-center justify-between mb-1">
         <h4 className="font-semibold text-primary">{title}</h4>
         <button
+          type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
           title="Copy to clipboard"
         >
           {copied ? (
@@ -70,6 +71,7 @@ export function CopyButton({ content, label = "Copy", className = "" }: CopyButt
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-muted transition-colors ${className}`}
       title="Copy to clipboard"
@@ -104,6 +106,7 @@ export function CopyAllButton({ content, className = "" }: { content: string; cl
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       className={`inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium hover:bg-muted transition-colors ${className}`}
     >

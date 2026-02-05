@@ -546,6 +546,8 @@ function formatResumeForCopy(content: ResumeData): string {
   sections.push(content.name);
   const contactLine = [content.email, content.phone, content.location].filter(Boolean).join(" | ");
   if (contactLine) sections.push(contactLine);
+  const linkLine = [content.linkedin, content.website].filter(Boolean).join(" | ");
+  if (linkLine) sections.push(linkLine);
   sections.push("");
 
   // Summary
@@ -575,6 +577,22 @@ function formatResumeForCopy(content: ResumeData): string {
     }
   }
 
+  // Projects
+  if (content.projects && content.projects.length > 0) {
+    sections.push("PROJECTS");
+    for (const project of content.projects) {
+      sections.push(`${project.name}${project.url ? ` | ${project.url}` : ""}`);
+      if (project.description) sections.push(project.description);
+      if (project.technologies?.length) {
+        sections.push(`Technologies: ${project.technologies.join(", ")}`);
+      }
+      for (const bullet of project.bullets) {
+        sections.push(`• ${bullet}`);
+      }
+      sections.push("");
+    }
+  }
+
   // Education
   if (content.education && content.education.length > 0) {
     sections.push("EDUCATION");
@@ -598,21 +616,43 @@ function formatExperienceForCopy(exp: ResumeData["experience"][0]): string {
   return lines.join("\n");
 }
 
+function formatProjectForCopy(project: ResumeData["projects"][0]): string {
+  const lines: string[] = [];
+  lines.push(`${project.name}${project.url ? ` | ${project.url}` : ""}`);
+  if (project.description) lines.push(project.description);
+  if (project.technologies?.length) {
+    lines.push(`Technologies: ${project.technologies.join(", ")}`);
+  }
+  for (const bullet of project.bullets) {
+    lines.push(`• ${bullet}`);
+  }
+  return lines.join("\n");
+}
+
 function ResumePreviewWithCopy({ content }: { content: ResumeData }) {
+  const contactLine = [content.email, content.phone, content.location].filter(Boolean).join(" • ");
+  const linkLine = [content.linkedin, content.website].filter(Boolean).join(" • ");
+  const headerCopy = [content.name, contactLine, linkLine].filter(Boolean).join("\n");
+
   return (
     <div className="space-y-4 text-sm">
       {/* Header */}
       <CopyableSection
         title="Header"
-        content={`${content.name}\n${[content.email, content.phone, content.location].filter(Boolean).join(" | ")}`}
+        content={headerCopy}
       >
         <div className="text-center border-b pb-4">
           <h3 className="text-lg font-bold">{content.name}</h3>
-          <p className="text-muted-foreground">
-            {[content.email, content.phone, content.location]
-              .filter(Boolean)
-              .join(" • ")}
-          </p>
+          {contactLine && (
+            <p className="text-muted-foreground">
+              {contactLine}
+            </p>
+          )}
+          {linkLine && (
+            <p className="text-muted-foreground text-xs mt-1">
+              {linkLine}
+            </p>
+          )}
         </div>
       </CopyableSection>
 
@@ -636,7 +676,11 @@ function ResumePreviewWithCopy({ content }: { content: ResumeData }) {
           <h4 className="font-semibold text-primary mb-2">Experience</h4>
           <div className="space-y-3">
             {content.experience.map((exp, i) => (
-              <div key={i} className="group relative pl-0 hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
+              <div
+                key={i}
+                className="group relative pl-0 hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors focus:outline-none"
+                tabIndex={0}
+              >
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="font-medium">{exp.title}</span>
@@ -649,7 +693,7 @@ function ResumePreviewWithCopy({ content }: { content: ResumeData }) {
                     <CopyButton
                       content={formatExperienceForCopy(exp)}
                       label="Copy"
-                      className="opacity-0 group-hover:opacity-100"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
                     />
                   </div>
                 </div>
@@ -658,6 +702,51 @@ function ResumePreviewWithCopy({ content }: { content: ResumeData }) {
                     <li key={j}>{bullet}</li>
                   ))}
                 </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Projects */}
+      {content.projects && content.projects.length > 0 && (
+        <div>
+          <h4 className="font-semibold text-primary mb-2">Projects</h4>
+          <div className="space-y-3">
+            {content.projects.map((project, i) => (
+              <div
+                key={i}
+                className="group relative pl-0 hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors focus:outline-none"
+                tabIndex={0}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <span className="font-medium">{project.name}</span>
+                    {project.url && (
+                      <span className="text-muted-foreground"> • {project.url}</span>
+                    )}
+                  </div>
+                  <CopyButton
+                    content={formatProjectForCopy(project)}
+                    label="Copy"
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+                  />
+                </div>
+                {project.description && (
+                  <div className="text-muted-foreground mt-1">{project.description}</div>
+                )}
+                {project.technologies && project.technologies.length > 0 && (
+                  <div className="text-muted-foreground text-xs mt-1">
+                    Tech: {project.technologies.join(", ")}
+                  </div>
+                )}
+                {project.bullets.length > 0 && (
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    {project.bullets.map((bullet, j) => (
+                      <li key={j}>{bullet}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>
