@@ -17,7 +17,7 @@ const tailoredResumeSchema = z.object({
       endDate: z.string().nullable(),
       location: z.string().nullable(),
       bullets: z.array(z.string()).describe("Achievement bullets rewritten to emphasize relevant skills"),
-    })
+    }).strict()
   ),
   projects: z.array(
     z.object({
@@ -26,10 +26,10 @@ const tailoredResumeSchema = z.object({
       technologies: z.array(z.string()),
       url: z.string().nullable(),
       bullets: z.array(z.string()),
-    })
+    }).strict()
   ),
   keywords: z.array(z.string()).describe("Keywords extracted from the job description"),
-});
+}).strict();
 
 // POST /api/applications/[id]/resume - Generate tailored resume
 export async function POST(
@@ -86,11 +86,24 @@ export async function POST(
       );
     }
 
+    if (!selectedResume.content) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Resume content is missing. Please upload a text-based PDF resume so we can parse it for tailoring.",
+        },
+        { status: 400 }
+      );
+    }
+
     const baseResume = selectedResume.content as ResumeData;
 
     // Generate tailored resume using AI
     const { object: tailored } = await generateObject({
-      model: openai("gpt-4o"),
+      model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
+      schemaName: "tailored_resume",
+      schemaDescription: "A tailored resume object and extracted keywords",
       schema: tailoredResumeSchema,
       prompt: `You are an expert ATS resume optimizer. Given a base resume and job description, create a tailored version that:
 

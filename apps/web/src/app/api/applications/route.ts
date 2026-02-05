@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const application = await db.application.create({
       data: {
-        userId: session.user.id,
+        user: { connect: { id: session.user.id } },
         companyName,
         title,
         location,

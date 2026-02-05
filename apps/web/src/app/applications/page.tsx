@@ -242,7 +242,7 @@ export default function ApplicationsPage() {
           <div className="text-center py-16">
             <h2 className="text-xl font-semibold mb-2">No applications yet</h2>
             <p className="text-muted-foreground mb-6">
-              Use the Chrome extension to save job postings, or paste a job URL below.
+              Click “Add Application” to start tracking your job applications.
             </p>
             <Link
               href="/applications/new"
