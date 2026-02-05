@@ -16,6 +16,7 @@ import {
   Trash2,
   Check,
   Upload,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
