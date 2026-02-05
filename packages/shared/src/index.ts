@@ -125,6 +125,11 @@ export interface ResumeProject {
   bullets: string[];
 }
 
+export interface ResumeSection {
+  title: string;
+  content: string[];
+}
+
 export interface ResumeData {
   name: string;
   email: string;
@@ -137,6 +142,7 @@ export interface ResumeData {
   experience: ResumeExperience[];
   education: ResumeEducation[];
   projects: ResumeProject[];
+  sections?: ResumeSection[];
 }
 
 export interface ResumeVersion {

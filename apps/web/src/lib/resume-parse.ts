@@ -34,6 +34,11 @@ const projectSchema = z.object({
   bullets: z.array(z.string()).describe("Key accomplishments or features"),
 }).strict();
 
+const sectionSchema = z.object({
+  title: z.string().describe("Section header title as written in the resume"),
+  content: z.array(z.string()).describe("Lines or bullets that belong to this section, in order"),
+}).strict();
+
 export const resumeSchema = z.object({
   name: z.string().describe("Full name of the person"),
   email: z.string().describe("Email address"),
@@ -46,6 +51,7 @@ export const resumeSchema = z.object({
   experience: z.array(experienceSchema).describe("Work experience entries, ordered from most recent to oldest"),
   education: z.array(educationSchema).describe("Education entries"),
   projects: z.array(projectSchema).describe("Personal or professional projects if any are mentioned"),
+  sections: z.array(sectionSchema).describe("All resume sections in the order they appear, including any extra headers"),
 }).strict();
 
 export type ParsedResume = ResumeData;
@@ -122,6 +128,8 @@ IMPORTANT GUIDELINES:
 - For experience bullets, preserve the actual achievements and responsibilities
 - Order experience from most recent to oldest
 - Be thorough - don't miss any sections
+- Build a sections array that captures every section header in order and ALL lines under each header
+- Include sections even if they overlap with structured fields (summary, skills, experience, education, projects)
 
 RESUME TEXT:
 ${pdfText}

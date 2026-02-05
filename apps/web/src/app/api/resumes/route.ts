@@ -36,6 +36,10 @@ const createResumeSchema = z.object({
       url: z.string().nullable().optional(),
       bullets: z.array(z.string()).default([]),
     })).default([]),
+    sections: z.array(z.object({
+      title: z.string(),
+      content: z.array(z.string()),
+    })).optional(),
   }),
   isDefault: z.boolean().optional(),
 });
