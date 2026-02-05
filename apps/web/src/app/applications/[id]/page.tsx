@@ -13,7 +13,6 @@ import {
   ChevronDown,
   Building2,
   DollarSign,
-  Pencil,
   Trash2,
   Check,
   Upload,
@@ -109,7 +108,6 @@ export default function ApplicationDetailPage({
 
   // For setting/changing resume used
   const [baseResumes, setBaseResumes] = useState<{ id: string; name: string }[]>([]);
-  const [editingResumeUsed, setEditingResumeUsed] = useState(false);
   const [selectedBaseResumeId, setSelectedBaseResumeId] = useState<string>("");
 
   useEffect(() => {
@@ -136,6 +134,7 @@ export default function ApplicationDetailPage({
       if (data.success) {
         setApplication(data.data);
         setNotes(data.data.notes || "");
+        setSelectedBaseResumeId(data.data.appliedWithResumeId || "");
       } else {
         setError(data.error || "Application not found");
       }
@@ -501,9 +500,6 @@ export default function ApplicationDetailPage({
                   <p className="text-sm text-muted-foreground">
                     This should match the resume you actually submitted for this job.
                   </p>
-                  {finalResumeError && (
-                    <div className="text-sm text-destructive">{finalResumeError}</div>
-                  )}
                   {application.finalResumeFileName && (
                     <div className="text-sm text-muted-foreground">
                       Uploaded: {application.finalResumeFileName}
@@ -516,7 +512,7 @@ export default function ApplicationDetailPage({
                   )}
                   {!application.finalResumeFileName && application.appliedWithResume && (
                     <div className="text-sm text-muted-foreground">
-                      Selected base resume: {application.appliedWithResume.name}
+                      Selected resume: {application.appliedWithResume.name}
                     </div>
                   )}
                   {!application.finalResumeFileName && !application.appliedWithResume && (
@@ -524,112 +520,77 @@ export default function ApplicationDetailPage({
                       No resume recorded yet.
                     </div>
                   )}
-                  <div>
-                    <input
-                      ref={finalResumeInputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadFinalResume(file);
-                      }}
-                      disabled={finalResumeUploading}
-                    />
-                    <button
-                      onClick={() => finalResumeInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
-                      disabled={finalResumeUploading}
-                    >
-                      <Upload className="w-4 h-4" />
-                      {finalResumeUploading
-                        ? "Uploading..."
-                        : application.finalResumeFileName
-                        ? "Replace Final Resume"
-                        : "Upload Final Resume"}
-                    </button>
-                  </div>
                 </div>
 
-                {/* Base Resume Reference */}
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">Base Resume Reference (Optional)</h3>
-                    {!editingResumeUsed && baseResumes.length > 0 && (
-                      <button
-                        onClick={() => {
-                          setSelectedBaseResumeId(application.appliedWithResumeId || "");
-                          setEditingResumeUsed(true);
-                        }}
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        {application.appliedWithResume ? "Change" : "Set"}
-                      </button>
-                    )}
+                {/* Replace Resume */}
+                <div className="bg-card border rounded-lg p-6 space-y-4">
+                  <div>
+                    <h3 className="font-semibold">Replace Resume</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      If the wrong resume was selected, replace it here.
+                    </p>
                   </div>
 
-                  <p className="text-sm text-muted-foreground mb-3">
-                    If you applied without uploading a final resume, record which base resume you used.
-                  </p>
-
-                  {editingResumeUsed ? (
-                    <div className="space-y-3">
-                      <select
-                        value={selectedBaseResumeId}
-                        onChange={(e) => setSelectedBaseResumeId(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                      >
-                        <option value="">-- No resume selected --</option>
-                        {baseResumes.map((resume) => (
-                          <option key={resume.id} value={resume.id}>
-                            {resume.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveResumeUsed}
-                          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingResumeUsed(false)}
-                          className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : application.appliedWithResume ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                          <FileText className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{application.appliedWithResume.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Recorded for this application
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href={`/api/resumes/${application.appliedWithResume.id}/file`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 text-sm border rounded-lg hover:bg-muted transition-colors flex items-center gap-1"
-                      >
-                        <Download className="w-4 h-4" />
-                        View
-                      </a>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">
-                      No base resume recorded for this application.
-                    </p>
+                  {finalResumeError && (
+                    <div className="text-sm text-destructive">{finalResumeError}</div>
                   )}
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Upload a resume file</p>
+                    <div>
+                      <input
+                        ref={finalResumeInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadFinalResume(file);
+                        }}
+                        disabled={finalResumeUploading}
+                      />
+                      <button
+                        onClick={() => finalResumeInputRef.current?.click()}
+                        className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
+                        disabled={finalResumeUploading}
+                      >
+                        <Upload className="w-4 h-4" />
+                        {finalResumeUploading ? "Uploading..." : "Upload Resume"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Choose from saved resumes</p>
+                    {baseResumes.length > 0 ? (
+                      <div className="space-y-3">
+                        <select
+                          value={selectedBaseResumeId}
+                          onChange={(e) => setSelectedBaseResumeId(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        >
+                          <option value="">-- No resume selected --</option>
+                          {baseResumes.map((resume) => (
+                            <option key={resume.id} value={resume.id}>
+                              {resume.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div>
+                          <button
+                            onClick={saveResumeUsed}
+                            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+                          >
+                            Save Selection
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No saved resumes available.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -753,7 +714,7 @@ export default function ApplicationDetailPage({
                 </a>
               )}
 
-              {application.finalResumeFileName && (
+              {application.finalResumeFileName ? (
                 <a
                   href={`/api/applications/${application.id}/final-resume`}
                   target="_blank"
@@ -761,9 +722,19 @@ export default function ApplicationDetailPage({
                   className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
                 >
                   <Download className="w-4 h-4" />
-                  View Final Resume
+                  View Resume
                 </a>
-              )}
+              ) : application.appliedWithResume ? (
+                <a
+                  href={`/api/resumes/${application.appliedWithResume.id}/file`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  View Resume
+                </a>
+              ) : null}
 
               {statusLower === "saved" && (
                 <button
