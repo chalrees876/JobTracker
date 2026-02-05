@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Building2,
   DollarSign,
+  Pencil,
   Trash2,
   Check,
   Upload,
@@ -21,16 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ApplicationStatus,
   APPLICATION_STATUS_LABELS,
-  type ResumeData,
 } from "@shared/types";
-
-interface ResumeVersion {
-  id: string;
-  content: ResumeData;
-  keywords: string[];
-  createdAt: string;
-  baseResume: { name: string } | null;
-}
 
 interface ApplicationDetail {
   id: string;
@@ -53,7 +45,6 @@ interface ApplicationDetail {
   finalResumeUploadedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  resumeVersions: ResumeVersion[];
   contacts: {
     id: string;
     name: string;
@@ -101,7 +92,7 @@ export default function ApplicationDetailPage({
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "resume" | "contacts">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "contacts">("overview");
   const finalResumeInputRef = useRef<HTMLInputElement>(null);
   const [finalResumeUploading, setFinalResumeUploading] = useState(false);
   const [finalResumeError, setFinalResumeError] = useState("");
@@ -384,7 +375,7 @@ export default function ApplicationDetailPage({
           <div className="lg:col-span-2 space-y-6">
             {/* Tabs */}
             <div className="flex border-b">
-              {(["overview", "resume", "contacts"] as const).map((tab) => (
+              {(["overview", "contacts"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -396,7 +387,6 @@ export default function ApplicationDetailPage({
                   )}
                 >
                   {tab === "overview" && "Overview"}
-                  {tab === "resume" && "Resume"}
                   {tab === "contacts" && `Contacts (${application.contacts.length})`}
                 </button>
               ))}
@@ -404,74 +394,6 @@ export default function ApplicationDetailPage({
 
             {/* Overview Tab */}
             {activeTab === "overview" && (
-              <div className="space-y-6">
-                {/* Job Description */}
-                <div className="bg-card border rounded-lg p-6">
-                  <h2 className="font-semibold mb-4">Job Description</h2>
-                  {application.description ? (
-                    <div className="prose prose-sm max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
-                        {application.description}
-                      </pre>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No job description provided.</p>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Notes</h2>
-                    {!editingNotes && (
-                      <button
-                        onClick={() => setEditingNotes(true)}
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {editingNotes ? (
-                    <div className="space-y-3">
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={4}
-                        placeholder="Add notes about this application..."
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveNotes}
-                          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setNotes(application.notes || "");
-                            setEditingNotes(false);
-                          }}
-                          className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : application.notes ? (
-                    <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No notes yet. Click edit to add some.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Resume Tab */}
-            {activeTab === "resume" && (
               <div className="space-y-6">
                 {/* Resume Used */}
                 <div className="bg-card border rounded-lg p-6 space-y-3">
@@ -591,6 +513,69 @@ export default function ApplicationDetailPage({
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Job Description */}
+                <div className="bg-card border rounded-lg p-6">
+                  <h2 className="font-semibold mb-4">Job Description</h2>
+                  {application.description ? (
+                    <div className="prose prose-sm max-w-none">
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+                        {application.description}
+                      </pre>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No job description provided.</p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold">Notes</h2>
+                    {!editingNotes && (
+                      <button
+                        onClick={() => setEditingNotes(true)}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+
+                  {editingNotes ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={4}
+                        placeholder="Add notes about this application..."
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveNotes}
+                          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setNotes(application.notes || "");
+                            setEditingNotes(false);
+                          }}
+                          className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-muted"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : application.notes ? (
+                    <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No notes yet. Click edit to add some.</p>
+                  )}
                 </div>
               </div>
             )}

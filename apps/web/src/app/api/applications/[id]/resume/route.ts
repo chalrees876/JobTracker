@@ -9,7 +9,7 @@ import type { Prisma } from "@prisma/client";
 
 const tailoredResumeSchema = z.object({
   summary: z.string().describe("A 2-3 sentence professional summary tailored to the job"),
-  skills: z.array(z.string()).describe("Skills list reordered/filtered to match job requirements"),
+  skills: z.array(z.string()).describe("Skills reordered/trimmed to match job requirements (must exist in base resume)"),
   experience: z.array(
     z.object({
       company: z.string(),
@@ -17,7 +17,7 @@ const tailoredResumeSchema = z.object({
       startDate: z.string(),
       endDate: z.string().nullable(),
       location: z.string().nullable(),
-      bullets: z.array(z.string()).describe("Achievement bullets rewritten to emphasize relevant skills"),
+      bullets: z.array(z.string()).describe("Achievement bullets rewritten to emphasize relevant skills (no new facts)"),
     }).strict()
   ),
   projects: z.array(
@@ -29,7 +29,7 @@ const tailoredResumeSchema = z.object({
       bullets: z.array(z.string()),
     }).strict()
   ),
-  keywords: z.array(z.string()).describe("Keywords extracted from the job description"),
+  keywords: z.array(z.string()).describe("Keywords extracted from the job description (must appear in base resume)"),
 }).strict();
 
 type TailoredResume = z.infer<typeof tailoredResumeSchema>;
@@ -43,23 +43,50 @@ function validateTailored(base: ResumeData, tailored: TailoredResume): string | 
   if (!tailored.skills?.length) return "Missing skills";
   if (!tailored.keywords?.length) return "Missing keywords";
 
-  const baseCompanies = new Set(base.experience.map((exp) => normalizeText(exp.company)));
   if (tailored.experience.length !== base.experience.length) {
     return "Experience count changed";
   }
-  for (const exp of tailored.experience) {
-    if (!baseCompanies.has(normalizeText(exp.company))) {
-      return `Unknown company: ${exp.company}`;
+  for (let i = 0; i < base.experience.length; i += 1) {
+    const baseExp = base.experience[i];
+    const tailoredExp = tailored.experience[i];
+    if (
+      normalizeText(baseExp.company) !== normalizeText(tailoredExp.company) ||
+      normalizeText(baseExp.title) !== normalizeText(tailoredExp.title) ||
+      normalizeText(baseExp.startDate) !== normalizeText(tailoredExp.startDate) ||
+      normalizeText(baseExp.endDate || "") !== normalizeText(tailoredExp.endDate || "") ||
+      normalizeText(baseExp.location || "") !== normalizeText(tailoredExp.location || "")
+    ) {
+      return "Experience fields changed";
+    }
+    if (tailoredExp.bullets.length > baseExp.bullets.length) {
+      return "Experience bullet count increased";
     }
   }
 
-  const baseProjects = new Set((base.projects ?? []).map((project) => normalizeText(project.name)));
-  if (baseProjects.size === 0 && tailored.projects.length > 0) {
+  const baseProjects = base.projects ?? [];
+  if (baseProjects.length === 0 && tailored.projects.length > 0) {
     return "Projects added without a base project";
   }
-  for (const project of tailored.projects) {
-    if (baseProjects.size > 0 && !baseProjects.has(normalizeText(project.name))) {
-      return `Unknown project: ${project.name}`;
+  if (baseProjects.length > 0 && tailored.projects.length !== baseProjects.length) {
+    return "Project count changed";
+  }
+  for (let i = 0; i < baseProjects.length; i += 1) {
+    const baseProject = baseProjects[i];
+    const tailoredProject = tailored.projects[i];
+    if (normalizeText(baseProject.name) !== normalizeText(tailoredProject.name)) {
+      return `Unknown project: ${tailoredProject.name}`;
+    }
+    if (tailoredProject.bullets.length > baseProject.bullets.length) {
+      return "Project bullet count increased";
+    }
+  }
+
+  const baseSkills = base.skills.map((skill) => normalizeText(skill));
+  const isSkillInBase = (skill: string) =>
+    baseSkills.some((baseSkill) => baseSkill.includes(normalizeText(skill)) || normalizeText(skill).includes(baseSkill));
+  for (const skill of tailored.skills) {
+    if (!isSkillInBase(skill)) {
+      return `Unknown skill: ${skill}`;
     }
   }
 
@@ -75,7 +102,7 @@ function validateTailored(base: ResumeData, tailored: TailoredResume): string | 
   const keywordMatches = tailored.keywords.filter((keyword) =>
     combinedText.includes(keyword.toLowerCase())
   );
-  const minMatches = Math.min(3, tailored.keywords.length);
+  const minMatches = Math.min(6, Math.max(3, Math.floor(tailored.keywords.length * 0.5)));
   if (keywordMatches.length < minMatches) {
     return "Low keyword coverage";
   }
@@ -151,20 +178,26 @@ export async function POST(
 
     const baseResume = selectedResume.content as unknown as ResumeData;
 
-    const promptBase = `You are an expert ATS resume optimizer. Given a base resume and job description, create a tailored version that:
+    const promptBase = `You are an expert ATS resume optimizer. Given a base resume (structured JSON) and a job description, create a tailored version that:
 
-1. Reorders skills to put the most relevant ones first
-2. Rewrites experience bullets to emphasize matching skills and keywords
-3. Creates a summary tailored to this specific role
-4. Extracts key keywords from the job description
+1. Rewrites the summary to align with the role (2-3 concise sentences).
+2. Reorders and trims skills to the most relevant ones (ONLY from the base resume).
+3. Rewrites experience bullets to emphasize matching skills/keywords while preserving facts.
+4. Rewrites project descriptions/bullets to emphasize relevant skills (if projects exist).
+5. Extracts keywords from the job description that ALSO appear in the base resume.
+
+ATS STYLE:
+- Concise, action-oriented, no first-person, no filler
+- Keep bullets to ~1-2 lines
+- Preserve any metrics/numbers exactly as in the base resume
 
 CRITICAL CONSTRAINTS:
-- NEVER invent experience, companies, or projects that don't exist in the base resume
-- NEVER fabricate metrics or numbers - only include quantifiable achievements if they exist in the original
-- You may rephrase and reorder, but the underlying facts must remain truthful
-- Focus on highlighting relevant existing experience, not creating new content
+- Do NOT add or remove experience entries or projects
+- Preserve company/title/dates/location exactly and in the same order
+- Do NOT invent skills, tools, or technologies not present in the base resume
+- Do NOT fabricate metrics or results
 
-BASE RESUME:
+BASE RESUME (structured):
 ${JSON.stringify(baseResume, null, 2)}
 
 JOB DESCRIPTION:
@@ -174,16 +207,16 @@ Location: ${application.location || "Not specified"}
 
 ${application.description}
 
-Generate a tailored resume that will perform well in ATS systems while remaining completely truthful.`;
+Return JSON that matches the schema exactly.`;
 
     let tailored: TailoredResume | null = null;
     let validationError = "";
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
       const retryNote =
         attempt === 1
           ? ""
-          : "\n\nRETRY STRICTLY: Do not add or remove experience entries or projects. Preserve all company names, titles, dates, and project names exactly. Only rephrase bullets, summary, and skills ordering.";
+          : "\n\nRETRY STRICTLY: Keep company/title/dates/location and project names identical and in the same order. Do not add new skills. Keep bullet counts the same or fewer. Include at least 50% of extracted keywords in the rewritten content.";
 
       const { object } = await generateObject({
         model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
