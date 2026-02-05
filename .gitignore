@@ -40,3 +40,4 @@ apps/extension/dist
 
 # Misc
 *.tsbuildinfo
+uploads/

@@ -89,14 +89,18 @@ model UserProfile {
 }
 
 // ============================================
-// Base Resumes (user's source resumes)
+// Base Resumes (user's uploaded resume files)
 // ============================================
 
 model BaseResume {
   id          String   @id @default(cuid())
   profileId   String
-  name        String   // e.g., "Software Engineer", "Frontend Developer", "General"
-  content     Json     // ResumeData JSON - the user's actual resume
+  name        String   // User-friendly name, e.g., "Software Engineer Resume"
+  fileName    String?  // Original filename, e.g., "John_Doe_Resume.pdf"
+  fileType    String?  // MIME type, e.g., "application/pdf"
+  fileSize    Int?     // Size in bytes
+  filePath    String?  // Path to stored file (local or S3 key)
+  content     Json?    // Optional: parsed resume data (ResumeData JSON)
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

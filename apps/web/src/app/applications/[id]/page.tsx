@@ -452,12 +452,21 @@ export default function ApplicationDetailPage({
                       <div className="p-2 bg-primary/10 rounded-lg">
                         <FileText className="w-5 h-5 text-primary" />
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium">{application.appliedWithResume.name}</p>
                         <p className="text-sm text-muted-foreground">
                           Used when applying on {application.appliedAt ? new Date(application.appliedAt).toLocaleDateString() : "N/A"}
                         </p>
                       </div>
+                      <a
+                        href={`/api/resumes/${application.appliedWithResume.id}/file`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-sm border rounded-lg hover:bg-muted transition-colors flex items-center gap-1"
+                      >
+                        <Download className="w-4 h-4" />
+                        View
+                      </a>
                     </div>
                   ) : (
                     <p className="text-muted-foreground text-sm">

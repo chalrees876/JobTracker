@@ -1,15 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Plus, FileText, Trash2, Star, Edit2, Check, X } from "lucide-react";
-import type { ResumeData } from "@shared/types";
+import {
+  Plus,
+  FileText,
+  Trash2,
+  Star,
+  Upload,
+  Download,
+  File,
+  Loader2,
+} from "lucide-react";
 
 interface BaseResume {
   id: string;
   name: string;
-  content: ResumeData;
+  fileName: string | null;
+  fileType: string | null;
+  fileSize: number | null;
   isDefault: boolean;
   createdAt: string;
 }
@@ -21,11 +31,24 @@ interface Profile {
   baseResumes: BaseResume[];
 }
 
+function formatFileSize(bytes: number | null): string {
+  if (!bytes) return "Unknown size";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileIcon(fileType: string | null): string {
+  if (fileType?.includes("pdf")) return "PDF";
+  if (fileType?.includes("word") || fileType?.includes("document")) return "DOC";
+  return "FILE";
+}
+
 export default function ProfilePage() {
   const { data: session } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAddResume, setShowAddResume] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -125,8 +148,8 @@ export default function ProfilePage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Your Profile</h1>
           <p className="text-muted-foreground">
-            Manage your base resumes. When you apply to jobs, we'll tailor these
-            to match the job description.
+            Upload your resumes as PDF or Word documents. Select which one you
+            used when tracking job applications.
           </p>
         </div>
 
@@ -153,36 +176,36 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Base Resumes */}
+        {/* Resumes Section */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold">Your Resumes</h2>
           <button
-            onClick={() => setShowAddResume(true)}
+            onClick={() => setShowUploadModal(true)}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Add Resume
+            <Upload className="w-4 h-4" />
+            Upload Resume
           </button>
         </div>
 
         {profile?.baseResumes.length === 0 ? (
-          <div className="bg-card border rounded-lg p-8 text-center">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No resumes yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Add your first resume to start generating tailored versions for
-              job applications.
+          <div className="bg-card border-2 border-dashed rounded-lg p-12 text-center">
+            <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No resumes uploaded yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Upload your resume as a PDF or Word document. You can upload
+              multiple versions for different types of positions.
             </p>
             <button
-              onClick={() => setShowAddResume(true)}
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium"
+              onClick={() => setShowUploadModal(true)}
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium"
             >
-              <Plus className="w-4 h-4" />
-              Add Your First Resume
+              <Upload className="w-4 h-4" />
+              Upload Your First Resume
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-4">
             {profile?.baseResumes.map((resume) => (
               <ResumeCard
                 key={resume.id}
@@ -194,10 +217,10 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Add Resume Modal */}
-        {showAddResume && (
-          <AddResumeModal
-            onClose={() => setShowAddResume(false)}
+        {/* Upload Modal */}
+        {showUploadModal && (
+          <UploadResumeModal
+            onClose={() => setShowUploadModal(false)}
             onSuccess={(newResume) => {
               setProfile((prev) =>
                 prev
@@ -207,7 +230,7 @@ export default function ProfilePage() {
                     }
                   : null
               );
-              setShowAddResume(false);
+              setShowUploadModal(false);
             }}
           />
         )}
@@ -225,33 +248,84 @@ function ResumeCard({
   onDelete: () => void;
   onSetDefault: () => void;
 }) {
-  const content = resume.content as ResumeData;
+  const fileIcon = getFileIcon(resume.fileType);
+
+  async function handleDownload() {
+    try {
+      const res = await fetch(`/api/resumes/${resume.id}/file`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = resume.fileName || "resume";
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error("Failed to download:", error);
+    }
+  }
+
+  async function handleView() {
+    try {
+      // Open in new tab
+      window.open(`/api/resumes/${resume.id}/file`, "_blank");
+    } catch (error) {
+      console.error("Failed to view:", error);
+    }
+  }
 
   return (
-    <div className="bg-card border rounded-lg p-4">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+    <div className="bg-card border rounded-lg p-4 hover:border-primary/50 transition-colors">
+      <div className="flex items-center gap-4">
+        {/* File Type Icon */}
+        <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+          <span className="text-xs font-bold text-primary">{fileIcon}</span>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold">{resume.name}</h3>
+            <h3 className="font-semibold truncate">{resume.name}</h3>
             {resume.isDefault && (
-              <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+              <span className="flex-shrink-0 flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                 <Star className="w-3 h-3" />
                 Default
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mb-2">
-            {content.name} • {content.email}
+          <p className="text-sm text-muted-foreground truncate">
+            {resume.fileName || "No file"}
           </p>
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>{content.experience?.length || 0} experiences</span>
-            <span>•</span>
-            <span>{content.skills?.length || 0} skills</span>
-            <span>•</span>
-            <span>{content.education?.length || 0} education</span>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            {formatFileSize(resume.fileSize)} •{" "}
+            {new Date(resume.createdAt).toLocaleDateString()}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          {resume.fileName && (
+            <>
+              <button
+                onClick={handleView}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                title="View"
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleDownload}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                title="Download"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            </>
+          )}
           {!resume.isDefault && (
             <button
               onClick={onSetDefault}
@@ -274,125 +348,185 @@ function ResumeCard({
   );
 }
 
-function AddResumeModal({
+function UploadResumeModal({
   onClose,
   onSuccess,
 }: {
   onClose: () => void;
   onSuccess: (resume: BaseResume) => void;
 }) {
-  const [step, setStep] = useState<"name" | "content">("name");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
-  // Resume content fields
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
-  const [linkedin, setLinkedin] = useState("");
-  const [website, setWebsite] = useState("");
-  const [summary, setSummary] = useState("");
-  const [skills, setSkills] = useState("");
-  const [experience, setExperience] = useState<
-    Array<{
-      company: string;
-      title: string;
-      startDate: string;
-      endDate: string;
-      location: string;
-      bullets: string;
-    }>
-  >([{ company: "", title: "", startDate: "", endDate: "", location: "", bullets: "" }]);
-  const [education, setEducation] = useState<
-    Array<{
-      institution: string;
-      degree: string;
-      field: string;
-      graduationDate: string;
-    }>
-  >([{ institution: "", degree: "", field: "", graduationDate: "" }]);
+  function handleFileSelect(selectedFile: File) {
+    // Validate file type
+    const validTypes = [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const ext = selectedFile.name.toLowerCase();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+    if (!validTypes.includes(selectedFile.type) &&
+        !ext.endsWith(".pdf") &&
+        !ext.endsWith(".doc") &&
+        !ext.endsWith(".docx")) {
+      setError("Please upload a PDF, DOC, or DOCX file.");
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setError("File is too large. Maximum size is 5MB.");
+      return;
+    }
+
+    setFile(selectedFile);
     setError("");
-    setSaving(true);
+
+    // Auto-fill name from filename if empty
+    if (!name) {
+      const nameWithoutExt = selectedFile.name.replace(/\.[^/.]+$/, "");
+      setName(nameWithoutExt);
+    }
+  }
+
+  function handleDrag(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  }
+
+  async function handleUpload() {
+    if (!file) {
+      setError("Please select a file to upload.");
+      return;
+    }
+
+    if (!name.trim()) {
+      setError("Please enter a name for this resume.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
 
     try {
-      const content: ResumeData = {
-        name: fullName,
-        email,
-        phone: phone || null,
-        location: location || null,
-        linkedin: linkedin || null,
-        website: website || null,
-        summary: summary || null,
-        skills: skills.split(",").map((s) => s.trim()).filter(Boolean),
-        experience: experience
-          .filter((e) => e.company && e.title)
-          .map((e) => ({
-            company: e.company,
-            title: e.title,
-            startDate: e.startDate,
-            endDate: e.endDate || null,
-            location: e.location || null,
-            bullets: e.bullets.split("\n").filter(Boolean),
-          })),
-        education: education
-          .filter((e) => e.institution && e.degree)
-          .map((e) => ({
-            institution: e.institution,
-            degree: e.degree,
-            field: e.field || null,
-            graduationDate: e.graduationDate || null,
-            gpa: null,
-          })),
-        projects: [],
-      };
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", name.trim());
 
-      const res = await fetch("/api/resumes", {
+      const res = await fetch("/api/resumes/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, content }),
+        body: formData,
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save resume");
+      if (data.success) {
+        onSuccess(data.data);
+      } else {
+        setError(data.error || "Failed to upload resume");
       }
-
-      onSuccess(data.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save resume");
+      setError("Failed to upload resume. Please try again.");
     } finally {
-      setSaving(false);
+      setUploading(false);
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card border rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-card border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Add Resume</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-muted rounded transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      <div className="bg-background rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Upload Resume</h2>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="bg-destructive/10 text-destructive px-4 py-2 rounded">
+            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg mb-4 text-sm">
               {error}
             </div>
           )}
 
-          {/* Resume Name */}
-          <div>
+          {/* Drag & Drop Zone */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragActive
+                ? "border-primary bg-primary/5"
+                : file
+                ? "border-green-500 bg-green-50"
+                : "border-muted-foreground/25 hover:border-primary/50"
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  handleFileSelect(e.target.files[0]);
+                }
+              }}
+            />
+
+            {file ? (
+              <div>
+                <File className="w-12 h-12 text-green-600 mx-auto mb-3" />
+                <p className="font-medium text-green-700">{file.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {formatFileSize(file.size)}
+                </p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                  }}
+                  className="text-sm text-primary hover:underline mt-2"
+                >
+                  Choose a different file
+                </button>
+              </div>
+            ) : (
+              <div>
+                <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="font-medium mb-1">
+                  Drag and drop your resume here
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Supports PDF, DOC, DOCX (max 5MB)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Name Input */}
+          <div className="mt-4">
             <label className="block text-sm font-medium mb-1">
               Resume Name *
             </label>
@@ -400,323 +534,42 @@ function AddResumeModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Software Engineer, Frontend Developer"
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              A name to help you identify this resume
-            </p>
-          </div>
-
-          <hr />
-
-          {/* Contact Info */}
-          <div>
-            <h3 className="font-medium mb-3">Contact Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="City, State"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  LinkedIn URL
-                </label>
-                <input
-                  type="url"
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Website/Portfolio
-                </label>
-                <input
-                  type="url"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Professional Summary
-            </label>
-            <textarea
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              rows={3}
-              placeholder="Brief overview of your experience and goals..."
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-
-          {/* Skills */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Skills</label>
-            <textarea
-              value={skills}
-              onChange={(e) => setSkills(e.target.value)}
-              rows={2}
-              placeholder="JavaScript, React, Node.js, Python, AWS..."
+              placeholder="e.g., Software Engineer Resume, General Resume"
               className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Comma-separated list of skills
+              Give your resume a descriptive name to easily identify it later.
             </p>
-          </div>
-
-          {/* Experience */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium">Experience</h3>
-              <button
-                type="button"
-                onClick={() =>
-                  setExperience([
-                    ...experience,
-                    { company: "", title: "", startDate: "", endDate: "", location: "", bullets: "" },
-                  ])
-                }
-                className="text-sm text-primary hover:underline"
-              >
-                + Add Experience
-              </button>
-            </div>
-            <div className="space-y-4">
-              {experience.map((exp, i) => (
-                <div key={i} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Experience {i + 1}
-                    </span>
-                    {experience.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExperience(experience.filter((_, j) => j !== i))
-                        }
-                        className="text-sm text-destructive hover:underline"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={exp.company}
-                      onChange={(e) => {
-                        const updated = [...experience];
-                        updated[i].company = e.target.value;
-                        setExperience(updated);
-                      }}
-                      placeholder="Company"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={exp.title}
-                      onChange={(e) => {
-                        const updated = [...experience];
-                        updated[i].title = e.target.value;
-                        setExperience(updated);
-                      }}
-                      placeholder="Job Title"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={exp.startDate}
-                      onChange={(e) => {
-                        const updated = [...experience];
-                        updated[i].startDate = e.target.value;
-                        setExperience(updated);
-                      }}
-                      placeholder="Start Date (e.g., Jan 2020)"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={exp.endDate}
-                      onChange={(e) => {
-                        const updated = [...experience];
-                        updated[i].endDate = e.target.value;
-                        setExperience(updated);
-                      }}
-                      placeholder="End Date (or Present)"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <textarea
-                    value={exp.bullets}
-                    onChange={(e) => {
-                      const updated = [...experience];
-                      updated[i].bullets = e.target.value;
-                      setExperience(updated);
-                    }}
-                    rows={3}
-                    placeholder="Achievements and responsibilities (one per line)"
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Education */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-medium">Education</h3>
-              <button
-                type="button"
-                onClick={() =>
-                  setEducation([
-                    ...education,
-                    { institution: "", degree: "", field: "", graduationDate: "" },
-                  ])
-                }
-                className="text-sm text-primary hover:underline"
-              >
-                + Add Education
-              </button>
-            </div>
-            <div className="space-y-4">
-              {education.map((edu, i) => (
-                <div key={i} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Education {i + 1}
-                    </span>
-                    {education.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEducation(education.filter((_, j) => j !== i))
-                        }
-                        className="text-sm text-destructive hover:underline"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={edu.institution}
-                      onChange={(e) => {
-                        const updated = [...education];
-                        updated[i].institution = e.target.value;
-                        setEducation(updated);
-                      }}
-                      placeholder="Institution"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={edu.degree}
-                      onChange={(e) => {
-                        const updated = [...education];
-                        updated[i].degree = e.target.value;
-                        setEducation(updated);
-                      }}
-                      placeholder="Degree (e.g., B.S.)"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={edu.field}
-                      onChange={(e) => {
-                        const updated = [...education];
-                        updated[i].field = e.target.value;
-                        setEducation(updated);
-                      }}
-                      placeholder="Field of Study"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                    <input
-                      type="text"
-                      value={edu.graduationDate}
-                      onChange={(e) => {
-                        const updated = [...education];
-                        updated[i].graduationDate = e.target.value;
-                        setEducation(updated);
-                      }}
-                      placeholder="Graduation Date"
-                      className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 mt-6">
             <button
-              type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border rounded-lg hover:bg-muted transition-colors"
+              className="flex-1 px-4 py-2 border rounded-lg font-medium hover:bg-muted transition-colors"
+              disabled={uploading}
             >
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={saving || !name || !fullName || !email}
-              className="flex-1 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              onClick={handleUpload}
+              disabled={uploading || !file || !name.trim()}
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {saving ? "Saving..." : "Save Resume"}
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload
+                </>
+              )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
