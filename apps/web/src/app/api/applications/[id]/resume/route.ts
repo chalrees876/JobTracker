@@ -100,6 +100,7 @@ export async function POST(
     const baseResume = selectedResume.content as ResumeData;
 
     // Generate tailored resume using AI
+    // TODO: Add quality checks + retry loop (keyword coverage, no hallucinations, stronger tailoring).
     const { object: tailored } = await generateObject({
       model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
       schemaName: "tailored_resume",

@@ -374,6 +374,7 @@ export default function NewApplicationPage() {
             </div>
 
             {/* Actions */}
+            {/* TODO: Add "Upload Final Resume" for the actually-used file and "Use Existing Resume" fallback. */}
             <div className="flex gap-4">
               <button
                 onClick={() => {

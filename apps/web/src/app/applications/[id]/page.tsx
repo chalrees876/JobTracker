@@ -672,6 +672,7 @@ export default function ApplicationDetailPage({
                         <div className="bg-card border rounded-lg p-6">
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold">Resume Preview</h3>
+                            {/* TODO: Add "Upload Final Resume" action and "Use Existing Resume" fallback here. */}
                             <button
                               onClick={() => alert("PDF download coming soon!")}
                               className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm hover:bg-muted"
