@@ -132,7 +132,14 @@ export default function ApplicationsPage() {
     try {
       const res = await fetch(`/api/applications/${id}`, { method: "DELETE" });
       if (res.ok) {
-        setApplications((prev) => prev.filter((app) => app.id !== id));
+        setApplications((prev) => {
+          const updated = prev.filter((app) => app.id !== id);
+          // Show welcome state if this was the last application
+          if (updated.length === 0) {
+            setOnboardingState("no-applications");
+          }
+          return updated;
+        });
       }
     } catch (error) {
       console.error("Failed to delete application:", error);

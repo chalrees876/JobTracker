@@ -34,7 +34,17 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ success: true, data: profile });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...profile,
+        user: {
+          name: session.user.name,
+          email: session.user.email,
+          image: session.user.image,
+        },
+      },
+    });
   } catch (error) {
     console.error("Failed to fetch profile:", error);
     return NextResponse.json(
