@@ -12,8 +12,11 @@ import {
   Download,
   File,
   Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ResumePreviewToggle } from "@/components/ResumeViewer";
+import type { ResumeData, ResumeSection } from "@shared/types";
 
 interface BaseResume {
   id: string;
@@ -23,6 +26,7 @@ interface BaseResume {
   fileSize: number | null;
   isDefault: boolean;
   createdAt: string;
+  content: ResumeData | null;
 }
 
 interface Profile {
@@ -43,6 +47,65 @@ function getFileIcon(fileType: string | null): string {
   if (fileType?.includes("pdf")) return "PDF";
   if (fileType?.includes("word") || fileType?.includes("document")) return "DOC";
   return "FILE";
+}
+
+function getResumeSections(content: ResumeData | null): ResumeSection[] {
+  if (!content) return [];
+
+  if (Array.isArray(content.sections) && content.sections.length > 0) {
+    return content.sections;
+  }
+
+  const sections: ResumeSection[] = [];
+
+  if (content.summary) {
+    sections.push({ title: "Summary", content: [content.summary] });
+  }
+
+  if (content.skills?.length) {
+    sections.push({ title: "Skills", content: [content.skills.join(", ")] });
+  }
+
+  if (content.experience?.length) {
+    const experienceLines: string[] = [];
+    for (const exp of content.experience) {
+      const dateRange = `${exp.startDate} - ${exp.endDate || "Present"}`;
+      experienceLines.push(`${exp.title} — ${exp.company} (${dateRange})`);
+      if (exp.location) {
+        experienceLines.push(`Location: ${exp.location}`);
+      }
+      experienceLines.push(...exp.bullets);
+    }
+    sections.push({ title: "Experience", content: experienceLines });
+  }
+
+  if (content.education?.length) {
+    const educationLines: string[] = [];
+    for (const edu of content.education) {
+      const degreeLine = [edu.degree, edu.field].filter(Boolean).join(" ");
+      const gradLine = [edu.institution, edu.graduationDate].filter(Boolean).join(" • ");
+      educationLines.push(degreeLine || edu.institution);
+      if (gradLine && gradLine !== degreeLine) {
+        educationLines.push(gradLine);
+      }
+    }
+    sections.push({ title: "Education", content: educationLines });
+  }
+
+  if (content.projects?.length) {
+    const projectLines: string[] = [];
+    for (const project of content.projects) {
+      const header = [project.name, project.description].filter(Boolean).join(" — ");
+      projectLines.push(header);
+      if (project.technologies?.length) {
+        projectLines.push(`Tech: ${project.technologies.join(", ")}`);
+      }
+      projectLines.push(...project.bullets);
+    }
+    sections.push({ title: "Projects", content: projectLines });
+  }
+
+  return sections;
 }
 
 export default function ProfilePage() {
@@ -255,7 +318,10 @@ function ResumeCard({
   onDelete: () => void;
   onSetDefault: () => void;
 }) {
+  const [showParsed, setShowParsed] = useState(false);
   const fileIcon = getFileIcon(resume.fileType);
+  const sections = getResumeSections(resume.content);
+  const hasParsed = sections.length > 0;
 
   async function handleDownload() {
     try {
@@ -360,6 +426,45 @@ function ResumeCard({
             fileName={resume.fileName}
             label="Preview resume"
           />
+        </div>
+      )}
+
+      {hasParsed ? (
+        <div className="mt-4 border-t pt-4">
+          <button
+            type="button"
+            onClick={() => setShowParsed((prev) => !prev)}
+            className="w-full flex items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            aria-expanded={showParsed}
+          >
+            <span>Parsed overview</span>
+            {showParsed ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+
+          {showParsed && (
+            <div className="mt-4 space-y-4">
+              {sections.map((section, index) => (
+                <div key={`${section.title}-${index}`} className="space-y-2">
+                  <h4 className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {section.title}
+                  </h4>
+                  <div className="space-y-1 text-sm text-foreground/90">
+                    {section.content.map((line, lineIndex) => (
+                      <p key={`${section.title}-${lineIndex}`}>{line}</p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 text-xs text-muted-foreground">
+          Parsed overview unavailable. Upload a text-based PDF to enable parsing.
         </div>
       )}
     </div>
