@@ -122,7 +122,7 @@ model Application {
   companyName         String
   title               String
   location            String?
-  url                 String
+  url                 String?
   description         String            @db.Text
   descriptionHash     String            // For detecting duplicate/changed JDs
   salary              String?

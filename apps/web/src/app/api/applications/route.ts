@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { title, companyName, location, url, description, salary, source } = parsed.data;
+    const normalizedUrl = url?.trim() || null;
 
     // Hash the description to detect duplicates/changes
     const descriptionHash = crypto
@@ -95,18 +96,20 @@ export async function POST(request: NextRequest) {
       .slice(0, 16);
 
     // Check for existing application with same URL
-    const existing = await db.application.findFirst({
-      where: {
-        userId: session.user.id,
-        url,
-      },
-    });
+    if (normalizedUrl) {
+      const existing = await db.application.findFirst({
+        where: {
+          userId: session.user.id,
+          url: normalizedUrl,
+        },
+      });
 
-    if (existing) {
-      return NextResponse.json(
-        { success: false, error: "Application already exists for this job posting" },
-        { status: 409 }
-      );
+      if (existing) {
+        return NextResponse.json(
+          { success: false, error: "Application already exists for this job posting" },
+          { status: 409 }
+        );
+      }
     }
 
     const application = await db.application.create({
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
         companyName,
         title,
         location,
-        url,
+        url: normalizedUrl,
         description,
         descriptionHash,
         salary,

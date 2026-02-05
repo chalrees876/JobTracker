@@ -23,7 +23,7 @@ interface Application {
   companyName: string;
   title: string;
   location: string | null;
-  url: string;
+  url: string | null;
   status: string;
   createdAt: string;
   appliedAt: string | null;
@@ -327,14 +327,16 @@ export default function ApplicationsPage() {
                         >
                           <FileText className="w-4 h-4" />
                         </Link>
-                        <a
-                          href={app.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 hover:bg-muted rounded"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        {app.url && (
+                          <a
+                            href={app.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 hover:bg-muted rounded"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
                         <button
                           onClick={() => deleteApplication(app.id)}
                           className="p-1.5 hover:bg-destructive/10 rounded text-destructive"
@@ -436,14 +438,16 @@ function ApplicationCard({
             {application.contacts.length}
           </span>
         )}
-        <a
-          href={application.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto hover:text-primary"
-        >
-          <ExternalLink className="w-3 h-3" />
-        </a>
+        {application.url && (
+          <a
+            href={application.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto hover:text-primary"
+          >
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
       </div>
     </div>
   );

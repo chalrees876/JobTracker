@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   Plus,
@@ -141,6 +141,12 @@ export default function ProfilePage() {
               </Link>
             </nav>
           </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 

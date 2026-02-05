@@ -50,7 +50,14 @@ export const createApplicationSchema = z.object({
   title: z.string().min(1),
   companyName: z.string().min(1),
   location: z.string().optional(),
-  url: z.string().url(),
+  url: z.preprocess(
+    (val) => {
+      if (val === null) return undefined;
+      if (typeof val === "string" && val.trim() === "") return undefined;
+      return val;
+    },
+    z.string().url().optional()
+  ),
   description: z.string(),
   salary: z.string().optional(),
   source: z.string().optional(),
@@ -72,7 +79,7 @@ export interface Application {
   companyName: string;
   title: string;
   location: string | null;
-  url: string;
+  url: string | null;
   description: string;
   descriptionHash: string;
   salary: string | null;

@@ -42,7 +42,7 @@ interface ApplicationDetail {
   companyName: string;
   title: string;
   location: string | null;
-  url: string;
+  url: string | null;
   description: string;
   salary: string | null;
   source: string | null;
@@ -288,6 +288,13 @@ export default function ApplicationDetailPage({
 
   const selectedResume = application.resumeVersions.find((r) => r.id === selectedResumeId);
   const statusLower = application.status.toLowerCase();
+  const hasUrl = Boolean(application.url);
+  const resumeCount =
+    application.resumeVersions.length > 0
+      ? application.resumeVersions.length
+      : application.appliedWithResume
+      ? 1
+      : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -350,15 +357,17 @@ export default function ApplicationDetailPage({
               </div>
 
               {/* External Link */}
-              <a
-                href={application.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 hover:bg-muted rounded-lg transition-colors"
-                title="View Job Posting"
-              >
-                <ExternalLink className="w-5 h-5" />
-              </a>
+              {hasUrl && (
+                <a
+                  href={application.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 hover:bg-muted rounded-lg transition-colors"
+                  title="View Job Posting"
+                >
+                  <ExternalLink className="w-5 h-5" />
+                </a>
+              )}
 
               {/* Delete */}
               <button
@@ -391,7 +400,8 @@ export default function ApplicationDetailPage({
                   )}
                 >
                   {tab === "overview" && "Overview"}
-                  {tab === "resume" && `Resumes (${application.resumeVersions.length})`}
+                  {tab === "resume" &&
+                    `Resumes${resumeCount ? ` (${resumeCount})` : ""}`}
                   {tab === "contacts" && `Contacts (${application.contacts.length})`}
                 </button>
               ))}
@@ -797,15 +807,17 @@ export default function ApplicationDetailPage({
             <div className="bg-card border rounded-lg p-6 space-y-3">
               <h3 className="font-semibold">Quick Actions</h3>
 
-              <a
-                href={application.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                View Job Posting
-              </a>
+              {hasUrl && (
+                <a
+                  href={application.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Job Posting
+                </a>
+              )}
 
               {application.resumeVersions.length > 0 && (
                 <button

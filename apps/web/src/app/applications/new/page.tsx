@@ -73,7 +73,7 @@ export default function NewApplicationPage() {
       body: JSON.stringify({
         companyName,
         title,
-        url: url || `https://example.com/jobs/${Date.now()}`,
+        url: url.trim() || undefined,
         description,
       }),
     });
@@ -224,7 +224,7 @@ export default function NewApplicationPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Job Posting URL
+                  Job Posting URL (Optional)
                 </label>
                 <input
                   type="url"
