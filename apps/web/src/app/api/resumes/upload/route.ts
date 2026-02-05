@@ -1,9 +1,13 @@
+export const runtime = "nodejs";
+
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { parseResumePdf } from "@/lib/resume-parse";
+import type { ResumeData } from "@shared/types";
 
 // Max file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -81,6 +85,30 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
+    let parsedContent: ResumeData | null = null;
+    if (ext === ".pdf") {
+      try {
+        const parsed = await parseResumePdf(buffer, filePath);
+        parsedContent = parsed.parsed;
+      } catch (error) {
+        const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined;
+        console.error("Failed to parse resume during upload:", error, cause);
+        const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+        const causeName =
+          cause && typeof cause === "object" && "name" in cause ? String((cause as { name?: string }).name) : "";
+        const message =
+          code === "NO_TEXT"
+            ? "Could not extract text from PDF. The file may be image-based or corrupted."
+            : causeName === "PasswordException"
+            ? "This PDF is password-protected. Please upload an unprotected, text-based PDF."
+            : "Failed to parse PDF. Please ensure the file is a valid, text-based PDF.";
+        return NextResponse.json(
+          { success: false, error: message },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if this is the first resume (make it default)
     const existingResumes = await db.baseResume.count({
       where: { profileId: profile.id },
@@ -97,6 +125,7 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         filePath: `${session.user.id}/${fileName}`, // Relative path for storage
         isDefault,
+        content: parsedContent,
       },
     });
 
