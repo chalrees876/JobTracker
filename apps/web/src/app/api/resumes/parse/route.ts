@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { parseResumePdf } from "@/lib/resume-parse";
+import path from "node:path";
 
 // POST /api/resumes/parse - Parse PDF and extract resume data
 export async function POST(request: NextRequest) {
@@ -25,7 +26,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (file.type !== "application/pdf") {
+    const ext = path.extname(file.name).toLowerCase();
+    const hasValidExt = ext === ".pdf";
+    const hasValidType = !file.type || file.type === "application/pdf";
+    if (!hasValidExt || !hasValidType) {
       return NextResponse.json(
         { success: false, error: "File must be a PDF" },
         { status: 400 }

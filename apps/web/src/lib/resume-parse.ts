@@ -2,7 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { unlink, writeFile, mkdir } from "node:fs/promises";
+import { unlink, writeFile, mkdir, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -57,6 +57,31 @@ export const resumeSchema = z.object({
 export type ParsedResume = ResumeData;
 
 const execFileAsync = promisify(execFile);
+const MIN_TEXT_LENGTH = 200;
+const TEMP_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+let didCleanupTempDir = false;
+
+async function cleanupTempDir(tempDir: string) {
+  try {
+    const entries = await readdir(tempDir);
+    const now = Date.now();
+    await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = path.join(tempDir, entry);
+        try {
+          const info = await stat(fullPath);
+          if (now - info.mtimeMs > TEMP_MAX_AGE_MS) {
+            await unlink(fullPath);
+          }
+        } catch (error) {
+          console.warn("Failed to cleanup temp resume file:", error);
+        }
+      })
+    );
+  } catch (error) {
+    console.warn("Failed to scan temp resume directory:", error);
+  }
+}
 
 function resolvePdfParseCli(): string {
   const candidates = [
@@ -77,6 +102,10 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   // Create temp file for pdf-parse CLI (always cleanup after)
   const tempDir = path.join(process.cwd(), "uploads", "tmp");
   await mkdir(tempDir, { recursive: true });
+  if (!didCleanupTempDir) {
+    didCleanupTempDir = true;
+    await cleanupTempDir(tempDir);
+  }
   const tempPath = path.join(tempDir, `${randomUUID()}.pdf`);
   await writeFile(tempPath, buffer);
 
@@ -88,7 +117,9 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
     );
     return stdout;
   } finally {
-    await unlink(tempPath).catch(() => undefined);
+    await unlink(tempPath).catch((error) => {
+      console.warn("Failed to remove temp resume file:", error);
+    });
   }
 }
 
@@ -109,7 +140,7 @@ export async function parseResumePdf(
     throw makeParseError("PDF_PARSE_FAILED", error);
   }
 
-  if (!pdfText || pdfText.trim().length < 50) {
+  if (!pdfText || pdfText.trim().length < MIN_TEXT_LENGTH) {
     throw makeParseError("NO_TEXT");
   }
 

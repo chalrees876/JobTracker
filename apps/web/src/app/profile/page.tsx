@@ -218,8 +218,8 @@ export default function ProfilePage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Your Profile</h1>
           <p className="text-muted-foreground">
-            Upload your resumes as PDF or Word documents. Select which one you
-            used when tracking job applications.
+            Upload your resumes as PDF files. Select which one you used when
+            tracking job applications.
           </p>
         </div>
 
@@ -263,8 +263,8 @@ export default function ProfilePage() {
             <Upload className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No resumes uploaded yet</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Upload your resume as a PDF or Word document. You can upload
-              multiple versions for different types of positions.
+              Upload your resume as a PDF file. You can upload multiple
+              versions for different types of positions.
             </p>
             <button
               onClick={() => setShowUploadModal(true)}
@@ -489,16 +489,11 @@ function UploadResumeModal({
     // Validate file type
     const validTypes = [
       "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
     const ext = selectedFile.name.toLowerCase();
 
-    if (!validTypes.includes(selectedFile.type) &&
-        !ext.endsWith(".pdf") &&
-        !ext.endsWith(".doc") &&
-        !ext.endsWith(".docx")) {
-      setError("Please upload a PDF, DOC, or DOCX file.");
+    if (!validTypes.includes(selectedFile.type) && !ext.endsWith(".pdf")) {
+      setError("Please upload a PDF file.");
       return;
     }
 
@@ -606,7 +601,7 @@ function UploadResumeModal({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,application/pdf"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.[0]) {
