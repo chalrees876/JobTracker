@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -21,6 +21,7 @@ import {
   X,
   Plus,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,11 @@ interface ApplicationDetail {
   appliedAt: string | null;
   appliedWithResumeId: string | null;
   appliedWithResume: { id: string; name: string } | null;
+  finalResumeFileName: string | null;
+  finalResumeFileType: string | null;
+  finalResumeFileSize: number | null;
+  finalResumeFilePath: string | null;
+  finalResumeUploadedAt: string | null;
   createdAt: string;
   updatedAt: string;
   resumeVersions: ResumeVersion[];
@@ -104,6 +110,9 @@ export default function ApplicationDetailPage({
   const [activeTab, setActiveTab] = useState<"overview" | "resume" | "contacts">("overview");
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const finalResumeInputRef = useRef<HTMLInputElement>(null);
+  const [finalResumeUploading, setFinalResumeUploading] = useState(false);
+  const [finalResumeError, setFinalResumeError] = useState("");
 
   // For setting/changing resume used
   const [baseResumes, setBaseResumes] = useState<{ id: string; name: string }[]>([]);
@@ -248,6 +257,38 @@ export default function ApplicationDetailPage({
       alert("Failed to generate resume");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function uploadFinalResume(file: File) {
+    if (!application) return;
+    setFinalResumeUploading(true);
+    setFinalResumeError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/applications/${id}/final-resume`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload final resume");
+      setApplication((prev) =>
+        prev
+          ? {
+              ...prev,
+              finalResumeFileName: data.data?.fileName ?? prev.finalResumeFileName,
+              finalResumeFileType: data.data?.fileType ?? prev.finalResumeFileType,
+              finalResumeFileSize: data.data?.fileSize ?? prev.finalResumeFileSize,
+              finalResumeFilePath: data.data?.filePath ?? prev.finalResumeFilePath,
+              finalResumeUploadedAt: data.data?.uploadedAt ?? prev.finalResumeUploadedAt,
+            }
+          : prev
+      );
+    } catch (err) {
+      setFinalResumeError(err instanceof Error ? err.message : "Failed to upload final resume");
+    } finally {
+      setFinalResumeUploading(false);
     }
   }
 
@@ -554,6 +595,60 @@ export default function ApplicationDetailPage({
             {/* Resume Tab */}
             {activeTab === "resume" && (
               <div className="space-y-6">
+                {/* Final Resume */}
+                <div className="bg-card border rounded-lg p-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Final Resume</h3>
+                    {application.finalResumeFileName && (
+                      <a
+                        href={`/api/applications/${application.id}/final-resume`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline"
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Upload the exact file you actually submitted for this application.
+                  </p>
+                  {finalResumeError && (
+                    <div className="text-sm text-destructive">{finalResumeError}</div>
+                  )}
+                  {application.finalResumeFileName && (
+                    <div className="text-sm text-muted-foreground">
+                      Uploaded: {application.finalResumeFileName}
+                    </div>
+                  )}
+                  {application.finalResumeUploadedAt && (
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(application.finalResumeUploadedAt).toLocaleDateString()}
+                    </div>
+                  )}
+                  <div>
+                    <input
+                      ref={finalResumeInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadFinalResume(file);
+                      }}
+                      disabled={finalResumeUploading}
+                    />
+                    <button
+                      onClick={() => finalResumeInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
+                      disabled={finalResumeUploading}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {finalResumeUploading ? "Uploading..." : "Upload Final Resume"}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Base Resume Used */}
                 {application.appliedWithResume && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -672,7 +767,6 @@ export default function ApplicationDetailPage({
                         <div className="bg-card border rounded-lg p-6">
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="font-semibold">Resume Preview</h3>
-                            {/* TODO: Add "Upload Final Resume" action and "Use Existing Resume" fallback here. */}
                             <button
                               onClick={() => alert("PDF download coming soon!")}
                               className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm hover:bg-muted"

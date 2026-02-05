@@ -131,6 +131,11 @@ model Application {
   notes               String?           @db.Text
   appliedAt           DateTime?
   appliedWithResumeId String?           // Which base resume was used when applying
+  finalResumeFileName String?           // The actual resume file used
+  finalResumeFileType String?
+  finalResumeFileSize Int?
+  finalResumeFilePath String?
+  finalResumeUploadedAt DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 

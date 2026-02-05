@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileText, Loader2, Download, Check } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Download, Check, Upload } from "lucide-react";
 import type { ResumeData } from "@shared/types";
 
 interface BaseResume {
@@ -34,12 +34,17 @@ export default function NewApplicationPage() {
   // Resume state
   const [baseResumes, setBaseResumes] = useState<BaseResume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
+  const [appliedResumeId, setAppliedResumeId] = useState<string>("");
   const [loadingResumes, setLoadingResumes] = useState(true);
 
   // Generated result
   const [applicationId, setApplicationId] = useState<string>("");
   const [generatedResume, setGeneratedResume] = useState<GeneratedResume | null>(null);
   const [error, setError] = useState("");
+  const [finalResumeUploading, setFinalResumeUploading] = useState(false);
+  const [finalResumeError, setFinalResumeError] = useState("");
+  const [finalResumeFileName, setFinalResumeFileName] = useState<string | null>(null);
+  const [useExistingStatus, setUseExistingStatus] = useState("");
 
   useEffect(() => {
     fetchResumes();
@@ -55,8 +60,10 @@ export default function NewApplicationPage() {
         const defaultResume = data.data.find((r: BaseResume) => r.isDefault);
         if (defaultResume) {
           setSelectedResumeId(defaultResume.id);
+          setAppliedResumeId(defaultResume.id);
         } else if (data.data.length > 0) {
           setSelectedResumeId(data.data[0].id);
+          setAppliedResumeId(data.data[0].id);
         }
       }
     } catch (error) {
@@ -105,7 +112,7 @@ export default function NewApplicationPage() {
           body: JSON.stringify({
             status: "APPLIED",
             appliedAt: new Date().toISOString(),
-            appliedWithResumeId: selectedResumeId || null,
+            appliedWithResumeId: appliedResumeId || selectedResumeId || null,
           }),
         });
 
@@ -151,12 +158,58 @@ export default function NewApplicationPage() {
         body: JSON.stringify({
           status: "APPLIED",
           appliedAt: new Date().toISOString(),
-          appliedWithResumeId: selectedResumeId || null,
+          appliedWithResumeId: appliedResumeId || selectedResumeId || null,
         }),
       });
       router.push("/applications");
     } catch (error) {
       console.error("Failed to update status:", error);
+    }
+  }
+
+  async function uploadFinalResume(file: File) {
+    if (!applicationId) {
+      setFinalResumeError("Please generate a resume first.");
+      return;
+    }
+
+    setFinalResumeUploading(true);
+    setFinalResumeError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/applications/${applicationId}/final-resume`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload final resume");
+      setFinalResumeFileName(data.data?.fileName || file.name);
+    } catch (err) {
+      setFinalResumeError(err instanceof Error ? err.message : "Failed to upload final resume");
+    } finally {
+      setFinalResumeUploading(false);
+    }
+  }
+
+  async function useExistingResume() {
+    if (!applicationId) return;
+    if (!appliedResumeId) {
+      setUseExistingStatus("Please select a resume.");
+      return;
+    }
+    setUseExistingStatus("Saving...");
+    try {
+      const res = await fetch(`/api/applications/${applicationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appliedWithResumeId: appliedResumeId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save resume selection");
+      setUseExistingStatus("Saved. You can mark as applied when ready.");
+    } catch (err) {
+      setUseExistingStatus(err instanceof Error ? err.message : "Failed to save resume selection");
     }
   }
 
@@ -277,7 +330,10 @@ export default function NewApplicationPage() {
                         name="resume"
                         value={resume.id}
                         checked={selectedResumeId === resume.id}
-                        onChange={(e) => setSelectedResumeId(e.target.value)}
+                        onChange={(e) => {
+                          setSelectedResumeId(e.target.value);
+                          setAppliedResumeId(e.target.value);
+                        }}
                         className="w-4 h-4 text-primary"
                       />
                       <div className="flex-1">
@@ -373,8 +429,72 @@ export default function NewApplicationPage() {
               <ResumePreview content={generatedResume.content} />
             </div>
 
+            {/* Use Existing Resume */}
+            <div className="bg-card border rounded-lg p-6 space-y-3">
+              <div>
+                <h2 className="font-semibold">Use a Different Resume</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  If you don’t want the tailored version, pick a base resume instead.
+                </p>
+              </div>
+              <select
+                value={appliedResumeId}
+                onChange={(e) => setAppliedResumeId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              >
+                <option value="">-- Select a resume --</option>
+                {baseResumes.map((resume) => (
+                  <option key={resume.id} value={resume.id}>
+                    {resume.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-3 items-center">
+                <button
+                  onClick={useExistingResume}
+                  className="px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
+                >
+                  Use Selected Resume
+                </button>
+                {useExistingStatus && (
+                  <span className="text-xs text-muted-foreground">{useExistingStatus}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Upload Final Resume */}
+            <div className="bg-card border rounded-lg p-6 space-y-3">
+              <div>
+                <h2 className="font-semibold">Upload Final Resume</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload the exact file you actually submitted.
+                </p>
+              </div>
+              {finalResumeError && (
+                <div className="text-sm text-destructive">{finalResumeError}</div>
+              )}
+              {finalResumeFileName && (
+                <div className="text-sm text-muted-foreground">
+                  Uploaded: {finalResumeFileName}
+                </div>
+              )}
+              <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
+                <Upload className="w-4 h-4" />
+                {finalResumeUploading ? "Uploading..." : "Upload Final Resume"}
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadFinalResume(file);
+                  }}
+                  disabled={finalResumeUploading}
+                />
+              </label>
+            </div>
+
             {/* Actions */}
-            {/* TODO: Add "Upload Final Resume" for the actually-used file and "Use Existing Resume" fallback. */}
             <div className="flex gap-4">
               <button
                 onClick={() => {

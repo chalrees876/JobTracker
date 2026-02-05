@@ -87,6 +87,11 @@ export interface Application {
   status: ApplicationStatus;
   notes: string | null;
   appliedAt: Date | null;
+  finalResumeFileName: string | null;
+  finalResumeFileType: string | null;
+  finalResumeFileSize: number | null;
+  finalResumeFilePath: string | null;
+  finalResumeUploadedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

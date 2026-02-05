@@ -31,6 +31,57 @@ const tailoredResumeSchema = z.object({
   keywords: z.array(z.string()).describe("Keywords extracted from the job description"),
 }).strict();
 
+type TailoredResume = z.infer<typeof tailoredResumeSchema>;
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function validateTailored(base: ResumeData, tailored: TailoredResume): string | null {
+  if (!tailored.summary?.trim()) return "Missing summary";
+  if (!tailored.skills?.length) return "Missing skills";
+  if (!tailored.keywords?.length) return "Missing keywords";
+
+  const baseCompanies = new Set(base.experience.map((exp) => normalizeText(exp.company)));
+  if (tailored.experience.length !== base.experience.length) {
+    return "Experience count changed";
+  }
+  for (const exp of tailored.experience) {
+    if (!baseCompanies.has(normalizeText(exp.company))) {
+      return `Unknown company: ${exp.company}`;
+    }
+  }
+
+  const baseProjects = new Set((base.projects ?? []).map((project) => normalizeText(project.name)));
+  if (baseProjects.size === 0 && tailored.projects.length > 0) {
+    return "Projects added without a base project";
+  }
+  for (const project of tailored.projects) {
+    if (baseProjects.size > 0 && !baseProjects.has(normalizeText(project.name))) {
+      return `Unknown project: ${project.name}`;
+    }
+  }
+
+  const combinedText = [
+    tailored.summary,
+    ...tailored.skills,
+    ...tailored.experience.flatMap((exp) => exp.bullets),
+    ...tailored.projects.flatMap((project) => [project.description, ...project.bullets]),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const keywordMatches = tailored.keywords.filter((keyword) =>
+    combinedText.includes(keyword.toLowerCase())
+  );
+  const minMatches = Math.min(3, tailored.keywords.length);
+  if (keywordMatches.length < minMatches) {
+    return "Low keyword coverage";
+  }
+
+  return null;
+}
+
 // POST /api/applications/[id]/resume - Generate tailored resume
 export async function POST(
   request: NextRequest,
@@ -99,14 +150,7 @@ export async function POST(
 
     const baseResume = selectedResume.content as ResumeData;
 
-    // Generate tailored resume using AI
-    // TODO: Add quality checks + retry loop (keyword coverage, no hallucinations, stronger tailoring).
-    const { object: tailored } = await generateObject({
-      model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
-      schemaName: "tailored_resume",
-      schemaDescription: "A tailored resume object and extracted keywords",
-      schema: tailoredResumeSchema,
-      prompt: `You are an expert ATS resume optimizer. Given a base resume and job description, create a tailored version that:
+    const promptBase = `You are an expert ATS resume optimizer. Given a base resume and job description, create a tailored version that:
 
 1. Reorders skills to put the most relevant ones first
 2. Rewrites experience bullets to emphasize matching skills and keywords
@@ -130,7 +174,43 @@ Location: ${application.location || "Not specified"}
 ${application.description}
 
 Generate a tailored resume that will perform well in ATS systems while remaining completely truthful.`,
-    });
+    };
+
+    let tailored: TailoredResume | null = null;
+    let validationError = "";
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const retryNote =
+        attempt === 1
+          ? ""
+          : "\n\nRETRY STRICTLY: Do not add or remove experience entries or projects. Preserve all company names, titles, dates, and project names exactly. Only rephrase bullets, summary, and skills ordering.";
+
+      const { object } = await generateObject({
+        model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
+        schemaName: "tailored_resume",
+        schemaDescription: "A tailored resume object and extracted keywords",
+        schema: tailoredResumeSchema,
+        temperature: 0.2,
+        prompt: `${promptBase}${retryNote}`,
+      });
+
+      const error = validateTailored(baseResume, object);
+      if (!error) {
+        tailored = object;
+        break;
+      }
+      validationError = error;
+    }
+
+    if (!tailored) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Failed to generate a valid tailored resume (${validationError}). Please try again.`,
+        },
+        { status: 500 }
+      );
+    }
 
     // Merge tailored content with base resume (keep contact info, education, etc.)
     const tailoredResume: ResumeData = {
