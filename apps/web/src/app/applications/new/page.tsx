@@ -9,7 +9,9 @@ import type { ResumeData } from "@shared/types";
 interface BaseResume {
   id: string;
   name: string;
-  content: ResumeData;
+  fileName: string | null;
+  fileType: string | null;
+  content: ResumeData | null;
   isDefault: boolean;
 }
 
@@ -281,8 +283,7 @@ export default function NewApplicationPage() {
                       <div className="flex-1">
                         <div className="font-medium">{resume.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {resume.content.skills?.slice(0, 5).join(", ")}
-                          {(resume.content.skills?.length || 0) > 5 && "..."}
+                          {resume.fileName || (resume.content?.skills?.slice(0, 5).join(", ")) || "No file"}
                         </div>
                       </div>
                       {resume.isDefault && (
