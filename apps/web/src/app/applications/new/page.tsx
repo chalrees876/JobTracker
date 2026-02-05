@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileText, Loader2, Download, Check, Upload } from "lucide-react";
 import type { ResumeData } from "@shared/types";
+import { TailoringGuide, TailoringGuideLink } from "@/components/TailoringGuide";
+import { CopyableSection, CopyAllButton, CopyButton } from "@/components/CopyableSection";
+import { TailoringTips } from "@/components/TailoringTips";
 
 interface BaseResume {
   id: string;
@@ -45,6 +48,7 @@ export default function NewApplicationPage() {
   const [finalResumeError, setFinalResumeError] = useState("");
   const [finalResumeFileName, setFinalResumeFileName] = useState<string | null>(null);
   const [useExistingStatus, setUseExistingStatus] = useState("");
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     fetchResumes();
@@ -235,7 +239,7 @@ export default function NewApplicationPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
         {step === "form" && (
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
@@ -368,28 +372,37 @@ export default function NewApplicationPage() {
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-4">
-              <button
-                type="submit"
-                name="action"
-                value="mark_applied"
-                className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-              >
-                Mark as Applied
-              </button>
-              {baseResumes.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex gap-4">
                 <button
                   type="submit"
                   name="action"
-                  value="generate_resume"
-                  className="flex-1 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
+                  value="mark_applied"
+                  className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                 >
-                  Generate Tailored Resume
+                  Mark as Applied
                 </button>
+                {baseResumes.length > 0 && (
+                  <button
+                    type="submit"
+                    name="action"
+                    value="generate_resume"
+                    className="flex-1 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
+                  >
+                    Generate Tailored Resume
+                  </button>
+                )}
+              </div>
+              {baseResumes.length > 0 && (
+                <div className="text-center">
+                  <TailoringGuideLink onClick={() => setShowGuide(true)} />
+                </div>
               )}
             </div>
           </form>
         )}
+
+        <TailoringGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
 
         {step === "generating" && (
           <div className="text-center py-16">
@@ -405,122 +418,120 @@ export default function NewApplicationPage() {
           <div className="space-y-6">
             <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
               <Check className="w-5 h-5" />
-              Resume generated successfully!
+              Resume generated successfully! Hover over sections below to copy.
             </div>
 
-            {/* Keywords */}
-            <div className="bg-card border rounded-lg p-6">
-              <h2 className="font-semibold mb-3">Extracted Keywords</h2>
-              <div className="flex flex-wrap gap-2">
-                {generatedResume.keywords.map((keyword, i) => (
-                  <span
-                    key={i}
-                    className="bg-primary/10 text-primary px-2 py-1 rounded text-sm"
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Resume Preview */}
-            <div className="bg-card border rounded-lg p-6">
-              <h2 className="font-semibold mb-4">Tailored Resume Preview</h2>
-              <ResumePreview content={generatedResume.content} />
-            </div>
-
-            {/* Use Existing Resume */}
-            <div className="bg-card border rounded-lg p-6 space-y-3">
-              <div>
-                <h2 className="font-semibold">Use a Different Resume</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  If you don’t want the tailored version, pick a base resume instead.
-                </p>
-              </div>
-              <select
-                value={appliedResumeId}
-                onChange={(e) => setAppliedResumeId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              >
-                <option value="">-- Select a resume --</option>
-                {baseResumes.map((resume) => (
-                  <option key={resume.id} value={resume.id}>
-                    {resume.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-3 items-center">
-                <button
-                  onClick={useExistingResume}
-                  className="px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
-                >
-                  Use Selected Resume
-                </button>
-                {useExistingStatus && (
-                  <span className="text-xs text-muted-foreground">{useExistingStatus}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Upload Final Resume */}
-            <div className="bg-card border rounded-lg p-6 space-y-3">
-              <div>
-                <h2 className="font-semibold">Upload Final Resume</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Upload the exact file you actually submitted.
-                </p>
-              </div>
-              {finalResumeError && (
-                <div className="text-sm text-destructive">{finalResumeError}</div>
-              )}
-              {finalResumeFileName && (
-                <div className="text-sm text-muted-foreground">
-                  Uploaded: {finalResumeFileName}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Main Content - 2 columns */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Resume Preview with Copy Buttons */}
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold">Tailored Resume</h2>
+                    <CopyAllButton content={formatResumeForCopy(generatedResume.content)} />
+                  </div>
+                  <ResumePreviewWithCopy content={generatedResume.content} />
                 </div>
-              )}
-              <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
-                <Upload className="w-4 h-4" />
-                {finalResumeUploading ? "Uploading..." : "Upload Final Resume"}
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadFinalResume(file);
-                  }}
-                  disabled={finalResumeUploading}
-                />
-              </label>
-            </div>
 
-            {/* Actions */}
-            <div className="flex gap-4">
-              <button
-                onClick={() => {
-                  // TODO: Implement PDF download
-                  alert("PDF download coming soon!");
-                }}
-                className="flex-1 flex items-center justify-center gap-2 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Download PDF
-              </button>
-              <button
-                onClick={markAsApplied}
-                className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-              >
-                Mark as Applied
-              </button>
-            </div>
+                {/* Use Existing Resume */}
+                <div className="bg-card border rounded-lg p-6 space-y-3">
+                  <div>
+                    <h2 className="font-semibold">Use a Different Resume</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      If you don't want the tailored version, pick a base resume instead.
+                    </p>
+                  </div>
+                  <select
+                    value={appliedResumeId}
+                    onChange={(e) => setAppliedResumeId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  >
+                    <option value="">-- Select a resume --</option>
+                    {baseResumes.map((resume) => (
+                      <option key={resume.id} value={resume.id}>
+                        {resume.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex gap-3 items-center">
+                    <button
+                      onClick={useExistingResume}
+                      className="px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
+                    >
+                      Use Selected Resume
+                    </button>
+                    {useExistingStatus && (
+                      <span className="text-xs text-muted-foreground">{useExistingStatus}</span>
+                    )}
+                  </div>
+                </div>
 
-            <p className="text-center text-sm text-muted-foreground">
-              Or{" "}
-              <Link href="/applications" className="text-primary hover:underline">
-                save for later
-              </Link>{" "}
-              without marking as applied
-            </p>
+                {/* Upload Final Resume */}
+                <div className="bg-card border rounded-lg p-6 space-y-3">
+                  <div>
+                    <h2 className="font-semibold">Upload Final Resume</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Upload the exact file you actually submitted.
+                    </p>
+                  </div>
+                  {finalResumeError && (
+                    <div className="text-sm text-destructive">{finalResumeError}</div>
+                  )}
+                  {finalResumeFileName && (
+                    <div className="text-sm text-muted-foreground">
+                      Uploaded: {finalResumeFileName}
+                    </div>
+                  )}
+                  <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
+                    <Upload className="w-4 h-4" />
+                    {finalResumeUploading ? "Uploading..." : "Upload Final Resume"}
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadFinalResume(file);
+                      }}
+                      disabled={finalResumeUploading}
+                    />
+                  </label>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      // TODO: Implement PDF download
+                      alert("PDF download coming soon!");
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </button>
+                  <button
+                    onClick={markAsApplied}
+                    className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    Mark as Applied
+                  </button>
+                </div>
+
+                <p className="text-center text-sm text-muted-foreground">
+                  Or{" "}
+                  <Link href="/applications" className="text-primary hover:underline">
+                    save for later
+                  </Link>{" "}
+                  without marking as applied
+                </p>
+              </div>
+
+              {/* Sidebar - 1 column */}
+              <div className="space-y-4">
+                <TailoringTips keywords={generatedResume.keywords} />
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -528,33 +539,95 @@ export default function NewApplicationPage() {
   );
 }
 
-function ResumePreview({ content }: { content: ResumeData }) {
+function formatResumeForCopy(content: ResumeData): string {
+  const sections: string[] = [];
+
+  // Header
+  sections.push(content.name);
+  const contactLine = [content.email, content.phone, content.location].filter(Boolean).join(" | ");
+  if (contactLine) sections.push(contactLine);
+  sections.push("");
+
+  // Summary
+  if (content.summary) {
+    sections.push("SUMMARY");
+    sections.push(content.summary);
+    sections.push("");
+  }
+
+  // Skills
+  if (content.skills && content.skills.length > 0) {
+    sections.push("SKILLS");
+    sections.push(content.skills.join(", "));
+    sections.push("");
+  }
+
+  // Experience
+  if (content.experience && content.experience.length > 0) {
+    sections.push("EXPERIENCE");
+    for (const exp of content.experience) {
+      sections.push(`${exp.company} | ${exp.title}`);
+      sections.push(`${exp.startDate} - ${exp.endDate || "Present"}${exp.location ? ` | ${exp.location}` : ""}`);
+      for (const bullet of exp.bullets) {
+        sections.push(`• ${bullet}`);
+      }
+      sections.push("");
+    }
+  }
+
+  // Education
+  if (content.education && content.education.length > 0) {
+    sections.push("EDUCATION");
+    for (const edu of content.education) {
+      sections.push(`${edu.institution}`);
+      sections.push(`${edu.degree}${edu.field ? ` in ${edu.field}` : ""}${edu.graduationDate ? ` • ${edu.graduationDate}` : ""}`);
+      sections.push("");
+    }
+  }
+
+  return sections.join("\n");
+}
+
+function formatExperienceForCopy(exp: ResumeData["experience"][0]): string {
+  const lines: string[] = [];
+  lines.push(`${exp.company} | ${exp.title}`);
+  lines.push(`${exp.startDate} - ${exp.endDate || "Present"}${exp.location ? ` | ${exp.location}` : ""}`);
+  for (const bullet of exp.bullets) {
+    lines.push(`• ${bullet}`);
+  }
+  return lines.join("\n");
+}
+
+function ResumePreviewWithCopy({ content }: { content: ResumeData }) {
   return (
     <div className="space-y-4 text-sm">
       {/* Header */}
-      <div className="text-center border-b pb-4">
-        <h3 className="text-lg font-bold">{content.name}</h3>
-        <p className="text-muted-foreground">
-          {[content.email, content.phone, content.location]
-            .filter(Boolean)
-            .join(" • ")}
-        </p>
-      </div>
+      <CopyableSection
+        title="Header"
+        content={`${content.name}\n${[content.email, content.phone, content.location].filter(Boolean).join(" | ")}`}
+      >
+        <div className="text-center border-b pb-4">
+          <h3 className="text-lg font-bold">{content.name}</h3>
+          <p className="text-muted-foreground">
+            {[content.email, content.phone, content.location]
+              .filter(Boolean)
+              .join(" • ")}
+          </p>
+        </div>
+      </CopyableSection>
 
       {/* Summary */}
       {content.summary && (
-        <div>
-          <h4 className="font-semibold text-primary mb-1">Summary</h4>
+        <CopyableSection title="Summary" content={content.summary}>
           <p>{content.summary}</p>
-        </div>
+        </CopyableSection>
       )}
 
       {/* Skills */}
       {content.skills && content.skills.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-primary mb-1">Skills</h4>
+        <CopyableSection title="Skills" content={content.skills.join(", ")}>
           <p>{content.skills.join(", ")}</p>
-        </div>
+        </CopyableSection>
       )}
 
       {/* Experience */}
@@ -563,14 +636,23 @@ function ResumePreview({ content }: { content: ResumeData }) {
           <h4 className="font-semibold text-primary mb-2">Experience</h4>
           <div className="space-y-3">
             {content.experience.map((exp, i) => (
-              <div key={i}>
-                <div className="flex justify-between">
-                  <span className="font-medium">{exp.title}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {exp.startDate} - {exp.endDate || "Present"}
-                  </span>
+              <div key={i} className="group relative pl-0 hover:bg-muted/50 -mx-2 px-2 py-1 rounded transition-colors">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="font-medium">{exp.title}</span>
+                    <span className="text-muted-foreground"> at {exp.company}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs">
+                      {exp.startDate} - {exp.endDate || "Present"}
+                    </span>
+                    <CopyButton
+                      content={formatExperienceForCopy(exp)}
+                      label="Copy"
+                      className="opacity-0 group-hover:opacity-100"
+                    />
+                  </div>
                 </div>
-                <div className="text-muted-foreground">{exp.company}</div>
                 <ul className="list-disc list-inside mt-1 space-y-1">
                   {exp.bullets.map((bullet, j) => (
                     <li key={j}>{bullet}</li>
@@ -584,8 +666,12 @@ function ResumePreview({ content }: { content: ResumeData }) {
 
       {/* Education */}
       {content.education && content.education.length > 0 && (
-        <div>
-          <h4 className="font-semibold text-primary mb-2">Education</h4>
+        <CopyableSection
+          title="Education"
+          content={content.education
+            .map((edu) => `${edu.institution}\n${edu.degree}${edu.field ? ` in ${edu.field}` : ""}${edu.graduationDate ? ` • ${edu.graduationDate}` : ""}`)
+            .join("\n\n")}
+        >
           <div className="space-y-2">
             {content.education.map((edu, i) => (
               <div key={i}>
@@ -599,7 +685,7 @@ function ResumePreview({ content }: { content: ResumeData }) {
               </div>
             ))}
           </div>
-        </div>
+        </CopyableSection>
       )}
     </div>
   );
