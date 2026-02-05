@@ -10,13 +10,13 @@ import {
   FileText,
   Users,
   Trash2,
-  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ApplicationStatus,
   APPLICATION_STATUS_LABELS,
 } from "@shared/types";
+import { WelcomeCard } from "@/components/WelcomeCard";
 
 interface Application {
   id: string;
@@ -55,7 +55,8 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<"none" | "no-resume" | "no-applications">("none");
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     checkProfileAndFetch();
@@ -68,9 +69,12 @@ export default function ApplicationsPage() {
       const profileData = await profileRes.json();
 
       if (profileData.success) {
+        // Store user name for welcome message
+        setUserName(profileData.data.user?.name || null);
+
         const hasResumes = profileData.data.baseResumes?.length > 0;
         if (!hasResumes) {
-          setNeedsOnboarding(true);
+          setOnboardingState("no-resume");
           setLoading(false);
           return;
         }
@@ -90,6 +94,10 @@ export default function ApplicationsPage() {
       const data = await res.json();
       if (data.success) {
         setApplications(data.data.items);
+        // Show welcome state if no applications yet
+        if (data.data.items.length === 0) {
+          setOnboardingState("no-applications");
+        }
       }
     } catch (error) {
       console.error("Failed to fetch applications:", error);
@@ -124,7 +132,14 @@ export default function ApplicationsPage() {
     try {
       const res = await fetch(`/api/applications/${id}`, { method: "DELETE" });
       if (res.ok) {
-        setApplications((prev) => prev.filter((app) => app.id !== id));
+        setApplications((prev) => {
+          const updated = prev.filter((app) => app.id !== id);
+          // Show welcome state if this was the last application
+          if (updated.length === 0) {
+            setOnboardingState("no-applications");
+          }
+          return updated;
+        });
       }
     } catch (error) {
       console.error("Failed to delete application:", error);
@@ -147,31 +162,57 @@ export default function ApplicationsPage() {
     );
   }
 
-  if (needsOnboarding) {
+  if (onboardingState === "no-resume") {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b bg-background/95 backdrop-blur">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold text-primary">
               JobTracker
             </Link>
-          </div>
-        </header>
-        <main className="container mx-auto px-4 py-16 text-center max-w-xl">
-          <div className="bg-card border rounded-lg p-8">
-            <FileText className="w-16 h-16 text-primary mx-auto mb-4" />
-            <h1 className="text-2xl font-bold mb-2">Welcome to JobTracker!</h1>
-            <p className="text-muted-foreground mb-6">
-              Before you can start applying to jobs, you need to add your base resume.
-              We'll use this to generate tailored resumes for each application.
-            </p>
             <Link
               href="/profile"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              Set Up Your Profile
+              Profile
             </Link>
           </div>
+        </header>
+        <main className="container mx-auto px-4 py-16">
+          <WelcomeCard userName={userName} variant="no-resume" />
+        </main>
+      </div>
+    );
+  }
+
+  if (onboardingState === "no-applications") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-2xl font-bold text-primary">
+                JobTracker
+              </Link>
+              <nav className="flex gap-4 ml-8">
+                <Link
+                  href="/applications"
+                  className="text-foreground font-medium"
+                >
+                  Applications
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Profile
+                </Link>
+              </nav>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-16">
+          <WelcomeCard userName={userName} variant="no-applications" />
         </main>
       </div>
     );
@@ -238,21 +279,7 @@ export default function ApplicationsPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {applications.length === 0 ? (
-          <div className="text-center py-16">
-            <h2 className="text-xl font-semibold mb-2">No applications yet</h2>
-            <p className="text-muted-foreground mb-6">
-              Click “Add Application” to start tracking your job applications.
-            </p>
-            <Link
-              href="/applications/new"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg"
-            >
-              <Plus className="w-4 h-4" />
-              Add Application
-            </Link>
-          </div>
-        ) : view === "kanban" ? (
+        {view === "kanban" ? (
           <div className="flex gap-4 overflow-x-auto pb-4">
             {STATUS_COLUMNS.map((status) => (
               <div
