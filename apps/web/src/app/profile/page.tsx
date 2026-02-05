@@ -13,7 +13,7 @@ import {
   File,
   Loader2,
 } from "lucide-react";
-import { ResumeViewer } from "@/components/ResumeViewer";
+import { ResumePreviewToggle } from "@/components/ResumeViewer";
 
 interface BaseResume {
   id: string;
@@ -354,11 +354,11 @@ function ResumeCard({
 
       {resume.fileName && (
         <div className="mt-4">
-          <ResumeViewer
+          <ResumePreviewToggle
             src={`/api/resumes/${resume.id}/file`}
             fileType={resume.fileType}
             fileName={resume.fileName}
-            heightClassName="h-[360px]"
+            label="Preview resume"
           />
         </div>
       )}

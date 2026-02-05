@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileText, Loader2, Download, Check, Upload } from "lucide-react";
 import type { ResumeData } from "@shared/types";
-import { ResumeViewer } from "@/components/ResumeViewer";
+import { ResumePreviewToggle } from "@/components/ResumeViewer";
 
 interface BaseResume {
   id: string;
@@ -358,11 +358,11 @@ export default function NewApplicationPage() {
                 </div>
 
                 {selectedResume && (
-                  <ResumeViewer
+                  <ResumePreviewToggle
                     src={`/api/resumes/${selectedResume.id}/file`}
                     fileType={selectedResume.fileType}
                     fileName={selectedResume.fileName}
-                    heightClassName="h-[360px]"
+                    label="Preview selected resume"
                   />
                 )}
               </div>
@@ -465,11 +465,11 @@ export default function NewApplicationPage() {
                 ))}
               </select>
               {appliedResume && (
-                <ResumeViewer
+                <ResumePreviewToggle
                   src={`/api/resumes/${appliedResume.id}/file`}
                   fileType={appliedResume.fileType}
                   fileName={appliedResume.fileName}
-                  heightClassName="h-[360px]"
+                  label="Preview selected resume"
                 />
               )}
               <div className="flex gap-3 items-center">
@@ -502,11 +502,11 @@ export default function NewApplicationPage() {
                 </div>
               )}
               {finalResumeFileName && (
-                <ResumeViewer
+                <ResumePreviewToggle
                   src={`/api/applications/${applicationId}/final-resume`}
                   fileType={finalResumeFileType}
                   fileName={finalResumeFileName}
-                  heightClassName="h-[360px]"
+                  label="Preview uploaded resume"
                 />
               )}
               <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">

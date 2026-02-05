@@ -23,7 +23,7 @@ import {
   ApplicationStatus,
   APPLICATION_STATUS_LABELS,
 } from "@shared/types";
-import { ResumeViewer } from "@/components/ResumeViewer";
+import { ResumePreviewToggle } from "@/components/ResumeViewer";
 
 interface ApplicationDetail {
   id: string;
@@ -473,11 +473,11 @@ export default function ApplicationDetailPage({
                     </div>
                   )}
                   {resumeViewer && (
-                    <ResumeViewer
+                    <ResumePreviewToggle
                       src={resumeViewer.src}
                       fileType={resumeViewer.fileType}
                       fileName={resumeViewer.fileName}
-                      heightClassName="h-[420px]"
+                      label="Preview resume"
                     />
                   )}
                 </div>
@@ -537,11 +537,11 @@ export default function ApplicationDetailPage({
                         ))}
                       </select>
                       {selectedResumeMeta && (
-                        <ResumeViewer
+                        <ResumePreviewToggle
                           src={`/api/resumes/${selectedResumeMeta.id}/file`}
                           fileType={selectedResumeMeta.fileType}
                           fileName={selectedResumeMeta.fileName}
-                          heightClassName="h-[320px]"
+                          label="Preview selected resume"
                         />
                       )}
                         <div>
