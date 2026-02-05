@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileText, Loader2, Download, Check, Upload } from "lucide-react";
 import type { ResumeData } from "@shared/types";
+import { ResumeViewer } from "@/components/ResumeViewer";
 
 interface BaseResume {
   id: string;
@@ -44,6 +45,7 @@ export default function NewApplicationPage() {
   const [finalResumeUploading, setFinalResumeUploading] = useState(false);
   const [finalResumeError, setFinalResumeError] = useState("");
   const [finalResumeFileName, setFinalResumeFileName] = useState<string | null>(null);
+  const [finalResumeFileType, setFinalResumeFileType] = useState<string | null>(null);
   const [useExistingStatus, setUseExistingStatus] = useState("");
 
   useEffect(() => {
@@ -185,6 +187,7 @@ export default function NewApplicationPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to upload final resume");
       setFinalResumeFileName(data.data?.fileName || file.name);
+      setFinalResumeFileType(data.data?.fileType || file.type || null);
     } catch (err) {
       setFinalResumeError(err instanceof Error ? err.message : "Failed to upload final resume");
     } finally {
@@ -212,6 +215,9 @@ export default function NewApplicationPage() {
       setUseExistingStatus(err instanceof Error ? err.message : "Failed to save resume selection");
     }
   }
+
+  const selectedResume = baseResumes.find((resume) => resume.id === selectedResumeId) || null;
+  const appliedResume = baseResumes.find((resume) => resume.id === appliedResumeId) || null;
 
   if (loadingResumes) {
     return (
@@ -350,6 +356,15 @@ export default function NewApplicationPage() {
                     </label>
                   ))}
                 </div>
+
+                {selectedResume && (
+                  <ResumeViewer
+                    src={`/api/resumes/${selectedResume.id}/file`}
+                    fileType={selectedResume.fileType}
+                    fileName={selectedResume.fileName}
+                    heightClassName="h-[360px]"
+                  />
+                )}
               </div>
             )}
 
@@ -449,6 +464,14 @@ export default function NewApplicationPage() {
                   </option>
                 ))}
               </select>
+              {appliedResume && (
+                <ResumeViewer
+                  src={`/api/resumes/${appliedResume.id}/file`}
+                  fileType={appliedResume.fileType}
+                  fileName={appliedResume.fileName}
+                  heightClassName="h-[360px]"
+                />
+              )}
               <div className="flex gap-3 items-center">
                 <button
                   onClick={useExistingResume}
@@ -477,6 +500,14 @@ export default function NewApplicationPage() {
                 <div className="text-sm text-muted-foreground">
                   Uploaded: {finalResumeFileName}
                 </div>
+              )}
+              {finalResumeFileName && (
+                <ResumeViewer
+                  src={`/api/applications/${applicationId}/final-resume`}
+                  fileType={finalResumeFileType}
+                  fileName={finalResumeFileName}
+                  heightClassName="h-[360px]"
+                />
               )}
               <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
                 <Upload className="w-4 h-4" />

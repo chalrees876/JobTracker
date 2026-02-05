@@ -23,6 +23,7 @@ import {
   ApplicationStatus,
   APPLICATION_STATUS_LABELS,
 } from "@shared/types";
+import { ResumeViewer } from "@/components/ResumeViewer";
 
 interface ApplicationDetail {
   id: string;
@@ -98,7 +99,7 @@ export default function ApplicationDetailPage({
   const [finalResumeError, setFinalResumeError] = useState("");
 
   // For setting/changing resume used
-  const [baseResumes, setBaseResumes] = useState<{ id: string; name: string }[]>([]);
+  const [baseResumes, setBaseResumes] = useState<{ id: string; name: string; fileName: string | null; fileType: string | null }[]>([]);
   const [selectedBaseResumeId, setSelectedBaseResumeId] = useState<string>("");
 
   useEffect(() => {
@@ -111,7 +112,14 @@ export default function ApplicationDetailPage({
       const res = await fetch("/api/resumes");
       const data = await res.json();
       if (data.success) {
-        setBaseResumes(data.data.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })));
+        setBaseResumes(
+          data.data.map((r: { id: string; name: string; fileName: string | null; fileType: string | null }) => ({
+            id: r.id,
+            name: r.name,
+            fileName: r.fileName ?? null,
+            fileType: r.fileType ?? null,
+          }))
+        );
       }
     } catch (err) {
       console.error("Failed to fetch base resumes:", err);
@@ -282,6 +290,28 @@ export default function ApplicationDetailPage({
 
   const statusLower = application.status.toLowerCase();
   const hasUrl = Boolean(application.url);
+  const appliedResumeMeta =
+    application.appliedWithResumeId
+      ? baseResumes.find((resume) => resume.id === application.appliedWithResumeId) || null
+      : null;
+  const selectedResumeMeta =
+    selectedBaseResumeId
+      ? baseResumes.find((resume) => resume.id === selectedBaseResumeId) || null
+      : null;
+  const resumeViewer =
+    application.finalResumeFileName
+      ? {
+          src: `/api/applications/${application.id}/final-resume`,
+          fileType: application.finalResumeFileType,
+          fileName: application.finalResumeFileName,
+        }
+      : appliedResumeMeta
+      ? {
+          src: `/api/resumes/${appliedResumeMeta.id}/file`,
+          fileType: appliedResumeMeta.fileType,
+          fileName: appliedResumeMeta.fileName,
+        }
+      : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -442,6 +472,14 @@ export default function ApplicationDetailPage({
                       No resume recorded yet.
                     </div>
                   )}
+                  {resumeViewer && (
+                    <ResumeViewer
+                      src={resumeViewer.src}
+                      fileType={resumeViewer.fileType}
+                      fileName={resumeViewer.fileName}
+                      heightClassName="h-[420px]"
+                    />
+                  )}
                 </div>
 
                 {/* Replace Resume */}
@@ -486,18 +524,26 @@ export default function ApplicationDetailPage({
                     <p className="text-sm font-medium">Choose from saved resumes</p>
                     {baseResumes.length > 0 ? (
                       <div className="space-y-3">
-                        <select
-                          value={selectedBaseResumeId}
-                          onChange={(e) => setSelectedBaseResumeId(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                        >
-                          <option value="">-- No resume selected --</option>
-                          {baseResumes.map((resume) => (
-                            <option key={resume.id} value={resume.id}>
-                              {resume.name}
-                            </option>
-                          ))}
-                        </select>
+                      <select
+                        value={selectedBaseResumeId}
+                        onChange={(e) => setSelectedBaseResumeId(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      >
+                        <option value="">-- No resume selected --</option>
+                        {baseResumes.map((resume) => (
+                          <option key={resume.id} value={resume.id}>
+                            {resume.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedResumeMeta && (
+                        <ResumeViewer
+                          src={`/api/resumes/${selectedResumeMeta.id}/file`}
+                          fileType={selectedResumeMeta.fileType}
+                          fileName={selectedResumeMeta.fileName}
+                          heightClassName="h-[320px]"
+                        />
+                      )}
                         <div>
                           <button
                             onClick={saveResumeUsed}

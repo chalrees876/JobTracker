@@ -13,6 +13,7 @@ import {
   File,
   Loader2,
 } from "lucide-react";
+import { ResumeViewer } from "@/components/ResumeViewer";
 
 interface BaseResume {
   id: string;
@@ -350,6 +351,17 @@ function ResumeCard({
           </button>
         </div>
       </div>
+
+      {resume.fileName && (
+        <div className="mt-4">
+          <ResumeViewer
+            src={`/api/resumes/${resume.id}/file`}
+            fileType={resume.fileType}
+            fileName={resume.fileName}
+            heightClassName="h-[360px]"
+          />
+        </div>
+      )}
     </div>
   );
 }
