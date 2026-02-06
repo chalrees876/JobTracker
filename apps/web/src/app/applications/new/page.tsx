@@ -52,6 +52,7 @@ export default function NewApplicationPage() {
   const [useExistingStatus, setUseExistingStatus] = useState("");
   const [showGuide, setShowGuide] = useState(false);
   const [resumeChoice, setResumeChoice] = useState<"upload" | "existing" | "skip">("skip");
+  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
 
   useEffect(() => {
     fetchResumes();
@@ -130,6 +131,7 @@ export default function NewApplicationPage() {
     const action = submitter?.value; // "mark_applied" | "generate_resume"
 
     setError("");
+    setRequiresUpgrade(false);
 
     try {
       // Always create the application first (both scenarios need it)
@@ -172,13 +174,34 @@ export default function NewApplicationPage() {
       });
 
       const resumeData = await resumeRes.json();
-      if (!resumeRes.ok) throw new Error(resumeData.error || "Failed to generate resume");
+      if (!resumeRes.ok) {
+        if (resumeData?.code === "ATS_LIMIT_EXCEEDED") {
+          setError(resumeData.error || "Free generation limit reached.");
+          setRequiresUpgrade(true);
+          setStep("form");
+          return;
+        }
+        throw new Error(resumeData.error || "Failed to generate resume");
+      }
 
       setGeneratedResume(resumeData.data);
       setStep("review");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setStep("form");
+    }
+  }
+
+  async function handleUpgrade() {
+    try {
+      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start checkout");
+      if (data?.data?.url) {
+        window.location.href = data.data.url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start checkout");
     }
   }
 
@@ -204,11 +227,8 @@ export default function NewApplicationPage() {
 
   async function handleReviewApply() {
     if (resumeChoice === "existing") {
-      if (!appliedResumeId) {
-        setUseExistingStatus("Please select a saved resume.");
-        return;
-      }
-      await useExistingResume();
+      const saved = await useExistingResume();
+      if (!saved) return;
       await markAsApplied(appliedResumeId);
       return;
     }
@@ -250,11 +270,11 @@ export default function NewApplicationPage() {
     }
   }
 
-  async function useExistingResume() {
-    if (!applicationId) return;
+  async function useExistingResume(): Promise<boolean> {
+    if (!applicationId) return false;
     if (!appliedResumeId) {
       setUseExistingStatus("Please select a resume.");
-      return;
+      return false;
     }
     setUseExistingStatus("Saving...");
     try {
@@ -266,8 +286,10 @@ export default function NewApplicationPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save resume selection");
       setUseExistingStatus("Saved. You can mark as applied when ready.");
+      return true;
     } catch (err) {
       setUseExistingStatus(err instanceof Error ? err.message : "Failed to save resume selection");
+      return false;
     }
   }
 
@@ -297,8 +319,17 @@ export default function NewApplicationPage() {
         {step === "form" && (
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg">
-                {error}
+              <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg space-y-3">
+                <p>{error}</p>
+                {requiresUpgrade && (
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    Upgrade to Continue
+                  </button>
+                )}
               </div>
             )}
 
