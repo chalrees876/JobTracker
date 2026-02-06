@@ -1,11 +1,109 @@
 "use client";
 
-import { useState } from "react";
 import { X, FileText, Sparkles, Copy, CheckCircle, HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TailoringGuideProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+type GuideStep = {
+  title: string;
+  description: string;
+  icon: typeof FileText;
+  accent: "primary" | "success";
+};
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    title: "1. We analyze the job description",
+    description:
+      "We extract key skills, technologies, and requirements that the employer is looking for.",
+    icon: FileText,
+    accent: "primary",
+  },
+  {
+    title: "2. We tailor your content",
+    description:
+      "Your experience bullets are rewritten to highlight relevant skills. We reorder your skills to put the most relevant ones first. A new summary is crafted specifically for this role.",
+    icon: Sparkles,
+    accent: "primary",
+  },
+  {
+    title: "3. You copy to your resume",
+    description:
+      "Use the copy buttons to grab each section, then paste into your resume document. We recommend using our Google Docs template for consistent formatting.",
+    icon: Copy,
+    accent: "primary",
+  },
+  {
+    title: "4. Submit your application",
+    description:
+      "Upload the final resume you submitted and mark the application as applied. We'll keep track of everything for you.",
+    icon: CheckCircle,
+    accent: "success",
+  },
+];
+
+const IMPORTANT_NOTES = [
+  "We never invent experience or companies",
+  "All content comes from your original resume",
+  "We only rephrase and reorder to highlight relevance",
+  "Always review the tailored content before using",
+];
+
+function GuideSteps({ layout }: { layout: "stacked" | "grid" }) {
+  return (
+    <div className={layout === "grid" ? "grid gap-6 md:grid-cols-2" : "space-y-6"}>
+      {GUIDE_STEPS.map((step) => {
+        const Icon = step.icon;
+        const accentStyles =
+          step.accent === "success"
+            ? "bg-green-100 text-green-600"
+            : "bg-primary/10 text-primary";
+        return (
+          <div key={step.title} className="flex gap-4">
+            <div className={cn("flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center", accentStyles)}>
+              <Icon className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">{step.title}</h3>
+              <p className="text-sm text-muted-foreground">{step.description}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ImportantNotes() {
+  return (
+    <div className="bg-muted/50 rounded-lg p-4">
+      <h4 className="font-medium text-sm mb-2">Important Notes</h4>
+      <ul className="text-sm text-muted-foreground space-y-1">
+        {IMPORTANT_NOTES.map((note) => (
+          <li key={note}>• {note}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function InlineTailoringGuide({ className }: { className?: string }) {
+  return (
+    <div className={cn("bg-card border rounded-xl p-6 space-y-6", className)}>
+      <div>
+        <h2 className="text-xl font-semibold mb-2">How Resume Tailoring Works</h2>
+        <p className="text-sm text-muted-foreground">
+          Generate ATS-tailored content from your resume and the job description, then copy the sections into your document.
+        </p>
+      </div>
+      <GuideSteps layout="grid" />
+      <ImportantNotes />
+    </div>
+  );
 }
 
 export function TailoringGuide({ isOpen, onClose }: TailoringGuideProps) {
@@ -25,73 +123,8 @@ export function TailoringGuide({ isOpen, onClose }: TailoringGuideProps) {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Step 1 */}
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <FileText className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">1. We analyze the job description</h3>
-              <p className="text-sm text-muted-foreground">
-                We extract key skills, technologies, and requirements that the employer is looking for.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">2. We tailor your content</h3>
-              <p className="text-sm text-muted-foreground">
-                Your experience bullets are rewritten to highlight relevant skills.
-                We reorder your skills to put the most relevant ones first.
-                A new summary is crafted specifically for this role.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Copy className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">3. You copy to your resume</h3>
-              <p className="text-sm text-muted-foreground">
-                Use the copy buttons to grab each section, then paste into your
-                resume document. We recommend using our Google Docs template for
-                consistent formatting.
-              </p>
-            </div>
-          </div>
-
-          {/* Step 4 */}
-          <div className="flex gap-4">
-            <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">4. Submit your application</h3>
-              <p className="text-sm text-muted-foreground">
-                Upload the final resume you submitted and mark the application as applied.
-                We'll keep track of everything for you.
-              </p>
-            </div>
-          </div>
-
-          {/* Important Note */}
-          <div className="bg-muted/50 rounded-lg p-4">
-            <h4 className="font-medium text-sm mb-2">Important Notes</h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• We never invent experience or companies</li>
-              <li>• All content comes from your original resume</li>
-              <li>• We only rephrase and reorder to highlight relevance</li>
-              <li>• Always review the tailored content before using</li>
-            </ul>
-          </div>
+          <GuideSteps layout="stacked" />
+          <ImportantNotes />
         </div>
 
         <div className="border-t px-6 py-4">

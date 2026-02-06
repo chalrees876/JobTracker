@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Briefcase, Upload, Plus, Sparkles } from "lucide-react";
+import { InlineTailoringGuide } from "@/components/TailoringGuide";
 
 interface WelcomeCardProps {
   userName?: string | null;
@@ -54,34 +55,40 @@ export function WelcomeCard({ userName, variant }: WelcomeCardProps) {
 
   // variant === "no-applications"
   return (
-    <div className="bg-card border rounded-xl p-8 max-w-lg mx-auto text-center">
-      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-        <Sparkles className="w-8 h-8 text-green-600" />
+    <div className="space-y-6">
+      <div className="bg-card border rounded-xl p-8 max-w-lg mx-auto text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Sparkles className="w-8 h-8 text-green-600" />
+        </div>
+
+        <h1 className="text-2xl font-bold mb-2">You're all set!</h1>
+
+        <p className="text-muted-foreground mb-6 leading-relaxed">
+          Your resume is uploaded and ready to go. Start adding job applications
+          to track your progress through the hiring process.
+        </p>
+
+        <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
+          <p className="font-medium text-sm mb-2">Quick tips:</p>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            <li>• Add applications as you apply to jobs</li>
+            <li>• Track status from "Saved" to "Offer"</li>
+            <li>• Never miss a follow-up again</li>
+          </ul>
+        </div>
+
+        <Link
+          href="/applications/new"
+          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Your First Application
+        </Link>
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">You're all set!</h1>
-
-      <p className="text-muted-foreground mb-6 leading-relaxed">
-        Your resume is uploaded and ready to go. Start adding job applications
-        to track your progress through the hiring process.
-      </p>
-
-      <div className="bg-muted/50 rounded-lg p-4 mb-6 text-left">
-        <p className="font-medium text-sm mb-2">Quick tips:</p>
-        <ul className="text-sm text-muted-foreground space-y-1">
-          <li>• Add applications as you apply to jobs</li>
-          <li>• Track status from "Saved" to "Offer"</li>
-          <li>• Never miss a follow-up again</li>
-        </ul>
+      <div className="max-w-4xl mx-auto">
+        <InlineTailoringGuide />
       </div>
-
-      <Link
-        href="/applications/new"
-        className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
-      >
-        <Plus className="w-4 h-4" />
-        Add Your First Application
-      </Link>
     </div>
   );
 }

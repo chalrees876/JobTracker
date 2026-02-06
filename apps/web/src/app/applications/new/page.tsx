@@ -389,7 +389,7 @@ export default function NewApplicationPage() {
                     value="generate_resume"
                     className="flex-1 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
                   >
-                    Generate Tailored Resume
+                    Generate ATS-Tailored Content
                   </button>
                 )}
               </div>
@@ -407,9 +407,9 @@ export default function NewApplicationPage() {
         {step === "generating" && (
           <div className="text-center py-16">
             <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Generating Your Resume</h2>
+            <h2 className="text-xl font-semibold mb-2">Generating ATS-Tailored Content</h2>
             <p className="text-muted-foreground">
-              Analyzing job description and tailoring your resume...
+              Analyzing the job description and tailoring your resume content...
             </p>
           </div>
         )}
@@ -418,7 +418,7 @@ export default function NewApplicationPage() {
           <div className="space-y-6">
             <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
               <Check className="w-5 h-5" />
-              Resume generated successfully! Hover over sections below to copy.
+              Tailored content generated! Hover over sections to copy.
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -427,7 +427,7 @@ export default function NewApplicationPage() {
                 {/* Resume Preview with Copy Buttons */}
                 <div className="bg-card border rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Tailored Resume</h2>
+                    <h2 className="font-semibold">Tailored Content</h2>
                     <CopyAllButton content={formatResumeForCopy(generatedResume.content)} />
                   </div>
                   <ResumePreviewWithCopy content={generatedResume.content} />

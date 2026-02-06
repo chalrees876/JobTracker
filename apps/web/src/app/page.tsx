@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus, FileText, Users, BarChart3 } from "lucide-react";
+import { InlineTailoringGuide } from "@/components/TailoringGuide";
 
 export default function Home() {
   return (
@@ -30,8 +31,8 @@ export default function Home() {
             Track Applications. Tailor Resumes. Land Jobs.
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            AI-powered job application tracker that generates tailored resumes
-            and helps you find the right contacts at every company.
+            Generate ATS-tailored content from your resume and the job description.
+            Track every application from saved to offer.
           </p>
           <Link
             href="/applications"
@@ -49,8 +50,8 @@ export default function Home() {
             </div>
             <h3 className="text-lg font-semibold mb-2">Tailored Resumes</h3>
             <p className="text-muted-foreground">
-              Generate ATS-optimized resumes tailored to each job description in
-              seconds.
+              Generate ATS-optimized content tailored to each job description.
+              Copy sections directly into your resume.
             </p>
           </div>
 
@@ -74,6 +75,12 @@ export default function Home() {
               Identify recruiters and hiring managers with AI-drafted outreach
               messages.
             </p>
+          </div>
+        </section>
+
+        <section className="mt-16">
+          <div className="max-w-5xl mx-auto">
+            <InlineTailoringGuide />
           </div>
         </section>
       </main>
