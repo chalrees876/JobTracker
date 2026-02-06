@@ -39,6 +39,8 @@ export default function NewApplicationPage() {
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [appliedResumeId, setAppliedResumeId] = useState<string>("");
   const [loadingResumes, setLoadingResumes] = useState(true);
+  const [baseResumeUploading, setBaseResumeUploading] = useState(false);
+  const [baseResumeError, setBaseResumeError] = useState("");
 
   // Generated result
   const [applicationId, setApplicationId] = useState<string>("");
@@ -75,6 +77,31 @@ export default function NewApplicationPage() {
       console.error("Failed to fetch resumes:", error);
     } finally {
       setLoadingResumes(false);
+    }
+  }
+
+  async function uploadBaseResume(file: File) {
+    setBaseResumeUploading(true);
+    setBaseResumeError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", file.name.replace(/\.[^/.]+$/, ""));
+
+      const res = await fetch("/api/resumes/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload resume");
+
+      setBaseResumes((prev) => [data.data as BaseResume, ...prev]);
+      setSelectedResumeId(data.data.id);
+      setAppliedResumeId(data.data.id);
+    } catch (err) {
+      setBaseResumeError(err instanceof Error ? err.message : "Failed to upload resume");
+    } finally {
+      setBaseResumeUploading(false);
     }
   }
 
@@ -336,16 +363,16 @@ export default function NewApplicationPage() {
               </div>
             </div>
 
-            {/* Resume Selection - only show if user has resumes */}
-            {baseResumes.length > 0 && (
-              <div className="bg-card border rounded-lg p-6 space-y-4">
-                <div>
-                  <h2 className="font-semibold">Resume Used (Optional)</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Select which resume you used to apply, or generate a tailored version.
-                  </p>
-                </div>
+            {/* Resume Selection */}
+            <div className="bg-card border rounded-lg p-6 space-y-4">
+              <div>
+                <h2 className="font-semibold">Resume Used</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select which resume you used to apply, or generate a tailored version.
+                </p>
+              </div>
 
+              {baseResumes.length > 0 ? (
                 <div className="space-y-2">
                   {baseResumes.map((resume) => (
                     <label
@@ -381,22 +408,40 @@ export default function NewApplicationPage() {
                     </label>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="bg-muted/50 border border-dashed rounded-lg p-4 text-center">
+                  <FileText className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No saved resumes yet. Upload one below to continue.
+                  </p>
+                </div>
+              )}
 
-            {/* No resumes hint */}
-            {baseResumes.length === 0 && (
-              <div className="bg-muted/50 border border-dashed rounded-lg p-6 text-center">
-                <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  No saved resumes yet.{" "}
-                  <Link href="/profile" className="text-primary hover:underline">
-                    Add a resume
-                  </Link>{" "}
-                  to generate tailored versions.
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-sm font-medium">Upload a new resume</p>
+                <p className="text-xs text-muted-foreground">
+                  Upload a PDF, DOC, or DOCX file to add it to your saved resumes.
                 </p>
+                {baseResumeError && (
+                  <div className="text-sm text-destructive">{baseResumeError}</div>
+                )}
+                <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  {baseResumeUploading ? "Uploading..." : "Upload Resume"}
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadBaseResume(file);
+                      e.currentTarget.value = "";
+                    }}
+                    disabled={baseResumeUploading}
+                  />
+                </label>
               </div>
-            )}
+            </div>
 
             {/* Action Buttons */}
             <div className="space-y-3">
