@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileText, Loader2, Download, Check, Upload } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Check, Upload, Clock } from "lucide-react";
 import type { ResumeData } from "@shared/types";
 import { TailoringGuide, TailoringGuideLink } from "@/components/TailoringGuide";
 import { CopyableSection, CopyAllButton, CopyButton } from "@/components/CopyableSection";
@@ -49,6 +49,7 @@ export default function NewApplicationPage() {
   const [finalResumeFileName, setFinalResumeFileName] = useState<string | null>(null);
   const [useExistingStatus, setUseExistingStatus] = useState("");
   const [showGuide, setShowGuide] = useState(false);
+  const [resumeChoice, setResumeChoice] = useState<"upload" | "existing" | "skip">("skip");
 
   useEffect(() => {
     fetchResumes();
@@ -154,21 +155,47 @@ export default function NewApplicationPage() {
     }
   }
 
-  async function markAsApplied() {
+  async function markAsApplied(resumeId?: string | null) {
     try {
+      const appliedResume = resumeId === undefined
+        ? (appliedResumeId || selectedResumeId || null)
+        : resumeId;
       await fetch(`/api/applications/${applicationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: "APPLIED",
           appliedAt: new Date().toISOString(),
-          appliedWithResumeId: appliedResumeId || selectedResumeId || null,
+          appliedWithResumeId: appliedResume,
         }),
       });
       router.push("/applications");
     } catch (error) {
       console.error("Failed to update status:", error);
     }
+  }
+
+  async function handleReviewApply() {
+    if (resumeChoice === "existing") {
+      if (!appliedResumeId) {
+        setUseExistingStatus("Please select a saved resume.");
+        return;
+      }
+      await useExistingResume();
+      await markAsApplied(appliedResumeId);
+      return;
+    }
+
+    if (resumeChoice === "upload") {
+      if (!finalResumeFileName) {
+        setFinalResumeError("Please upload the resume you submitted.");
+        return;
+      }
+      await markAsApplied(null);
+      return;
+    }
+
+    await markAsApplied(null);
   }
 
   async function uploadFinalResume(file: File) {
@@ -418,7 +445,7 @@ export default function NewApplicationPage() {
           <div className="space-y-6">
             <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
               <Check className="w-5 h-5" />
-              Tailored content generated! Hover over sections to copy.
+              Tailored content generated! Copy what you need into your resume.
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -433,98 +460,177 @@ export default function NewApplicationPage() {
                   <ResumePreviewWithCopy content={generatedResume.content} />
                 </div>
 
-                {/* Use Existing Resume */}
-                <div className="bg-card border rounded-lg p-6 space-y-3">
+                {/* Resume for This Application */}
+                <div className="bg-card border rounded-lg p-6 space-y-4">
                   <div>
-                    <h2 className="font-semibold">Use a Different Resume</h2>
+                    <h2 className="font-semibold">Resume for This Application</h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      If you don't want the tailored version, pick a base resume instead.
+                      Attach the resume you're submitting with this application.
                     </p>
                   </div>
-                  <select
-                    value={appliedResumeId}
-                    onChange={(e) => setAppliedResumeId(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  >
-                    <option value="">-- Select a resume --</option>
-                    {baseResumes.map((resume) => (
-                      <option key={resume.id} value={resume.id}>
-                        {resume.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex gap-3 items-center">
-                    <button
-                      onClick={useExistingResume}
-                      className="px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors"
-                    >
-                      Use Selected Resume
-                    </button>
-                    {useExistingStatus && (
-                      <span className="text-xs text-muted-foreground">{useExistingStatus}</span>
-                    )}
-                  </div>
-                </div>
 
-                {/* Upload Final Resume */}
-                <div className="bg-card border rounded-lg p-6 space-y-3">
-                  <div>
-                    <h2 className="font-semibold">Upload Final Resume</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Upload the exact file you actually submitted.
-                    </p>
+                  <div className="space-y-3">
+                    <label
+                      className={`flex gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                        resumeChoice === "upload" ? "border-primary bg-primary/5" : "hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="resumeChoice"
+                        value="upload"
+                        checked={resumeChoice === "upload"}
+                        onChange={() => setResumeChoice("upload")}
+                        className="mt-1 h-4 w-4 text-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 font-medium">
+                          <Upload className="w-4 h-4 text-primary" />
+                          Upload new resume
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Upload the resume you updated with the tailored content above.
+                        </p>
+                      </div>
+                    </label>
+
+                    {resumeChoice === "upload" && (
+                      <div className="space-y-2 border rounded-lg p-4">
+                        {finalResumeError && (
+                          <div className="text-sm text-destructive">{finalResumeError}</div>
+                        )}
+                        {finalResumeFileName && (
+                          <div className="text-sm text-muted-foreground">
+                            Uploaded: {finalResumeFileName}
+                          </div>
+                        )}
+                        <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
+                          <Upload className="w-4 h-4" />
+                          {finalResumeUploading ? "Uploading..." : "Upload Resume"}
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) uploadFinalResume(file);
+                            }}
+                            disabled={finalResumeUploading}
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    <label
+                      className={`flex gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                        resumeChoice === "existing" ? "border-primary bg-primary/5" : "hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="resumeChoice"
+                        value="existing"
+                        checked={resumeChoice === "existing"}
+                        onChange={() => setResumeChoice("existing")}
+                        className="mt-1 h-4 w-4 text-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 font-medium">
+                          <FileText className="w-4 h-4 text-primary" />
+                          Use a saved resume
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Select from your saved resumes.
+                        </p>
+                      </div>
+                    </label>
+
+                    {resumeChoice === "existing" && (
+                      <div className="space-y-2 border rounded-lg p-4">
+                        {baseResumes.length > 0 ? (
+                          <div className="space-y-2">
+                            {baseResumes.map((resume) => (
+                              <label
+                                key={resume.id}
+                                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                                  appliedResumeId === resume.id
+                                    ? "border-primary bg-primary/5"
+                                    : "hover:bg-muted"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="savedResume"
+                                  value={resume.id}
+                                  checked={appliedResumeId === resume.id}
+                                  onChange={(e) => setAppliedResumeId(e.target.value)}
+                                  className="h-4 w-4 text-primary"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium">{resume.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {resume.fileName || (resume.content?.skills?.slice(0, 5).join(", ")) || "No file"}
+                                  </div>
+                                </div>
+                                {resume.isDefault && (
+                                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                    Default
+                                  </span>
+                                )}
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            No saved resumes available.
+                          </p>
+                        )}
+                        {useExistingStatus && (
+                          <div className="text-xs text-muted-foreground">{useExistingStatus}</div>
+                        )}
+                      </div>
+                    )}
+
+                    <label
+                      className={`flex gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${
+                        resumeChoice === "skip" ? "border-primary bg-primary/5" : "hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="resumeChoice"
+                        value="skip"
+                        checked={resumeChoice === "skip"}
+                        onChange={() => setResumeChoice("skip")}
+                        className="mt-1 h-4 w-4 text-primary"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 font-medium">
+                          <Clock className="w-4 h-4 text-primary" />
+                          Skip for now
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          You can always attach a resume later from the application page.
+                        </p>
+                      </div>
+                    </label>
                   </div>
-                  {finalResumeError && (
-                    <div className="text-sm text-destructive">{finalResumeError}</div>
-                  )}
-                  {finalResumeFileName && (
-                    <div className="text-sm text-muted-foreground">
-                      Uploaded: {finalResumeFileName}
-                    </div>
-                  )}
-                  <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm hover:bg-muted transition-colors cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    {finalResumeUploading ? "Uploading..." : "Upload Final Resume"}
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) uploadFinalResume(file);
-                      }}
-                      disabled={finalResumeUploading}
-                    />
-                  </label>
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-4">
+                <div className="space-y-2">
                   <button
-                    onClick={() => {
-                      // TODO: Implement PDF download
-                      alert("PDF download coming soon!");
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 border py-3 rounded-lg font-medium hover:bg-muted transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download PDF
-                  </button>
-                  <button
-                    onClick={markAsApplied}
-                    className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                    onClick={handleReviewApply}
+                    className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
                   >
                     Mark as Applied
                   </button>
+                  <div className="text-center text-sm text-muted-foreground">
+                    <Link href="/applications" className="text-primary hover:underline">
+                      Save for later
+                    </Link>
+                  </div>
                 </div>
-
-                <p className="text-center text-sm text-muted-foreground">
-                  Or{" "}
-                  <Link href="/applications" className="text-primary hover:underline">
-                    save for later
-                  </Link>{" "}
-                  without marking as applied
-                </p>
               </div>
 
               {/* Sidebar - 1 column */}
