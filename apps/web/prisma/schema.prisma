@@ -17,6 +17,8 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  stripeCustomerId String? @unique
+  atsGenerationCount Int @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -24,6 +26,7 @@ model User {
   sessions     Session[]
   profile      UserProfile?
   applications Application[]
+  subscription Subscription?
 
   @@map("users")
 }
@@ -179,6 +182,26 @@ model ResumeVersion {
   @@index([applicationId])
   @@index([baseResumeId])
   @@map("resume_versions")
+}
+
+// ============================================
+// Billing
+// ============================================
+
+model Subscription {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  stripeCustomerId      String
+  stripeSubscriptionId  String   @unique
+  status                String
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
 }
 
 // ============================================

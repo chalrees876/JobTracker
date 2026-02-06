@@ -7,6 +7,9 @@ import { z } from "zod";
 import type { ResumeData } from "@shared/types";
 import type { Prisma } from "@prisma/client";
 
+const FREE_GENERATION_LIMIT = 2;
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
+
 const tailoredResumeSchema = z.object({
   summary: z.string().describe("A 2-3 sentence professional summary tailored to the job"),
   skills: z.array(z.string()).describe("Skills reordered/trimmed to match job requirements (must exist in base resume)"),
@@ -125,6 +128,32 @@ export async function POST(
     }
 
     const { id } = await params;
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      include: { subscription: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const hasActiveSubscription =
+      user.subscription && ACTIVE_SUBSCRIPTION_STATUSES.has(user.subscription.status);
+    if (!hasActiveSubscription && user.atsGenerationCount >= FREE_GENERATION_LIMIT) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You have used your 2 free ATS generations. Upgrade to continue.",
+          code: "ATS_LIMIT_EXCEEDED",
+        },
+        { status: 402 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const { baseResumeId } = body;
 
@@ -260,20 +289,30 @@ Return JSON that matches the schema exactly.`;
       projects: tailored.projects,
     };
 
-    // Save the resume version
-    const resumeVersion = await db.resumeVersion.create({
-      data: {
-        applicationId: id,
-        baseResumeId: selectedResume.id,
-        content: tailoredResume as unknown as Prisma.InputJsonValue,
-        keywords: tailored.keywords,
-        promptConfig: {
-          model: "gpt-4o",
+    // Save the resume version + increment free usage when applicable
+    const [resumeVersion] = await db.$transaction([
+      db.resumeVersion.create({
+        data: {
+          applicationId: id,
           baseResumeId: selectedResume.id,
-          timestamp: new Date().toISOString(),
+          content: tailoredResume as unknown as Prisma.InputJsonValue,
+          keywords: tailored.keywords,
+          promptConfig: {
+            model: "gpt-4o",
+            baseResumeId: selectedResume.id,
+            timestamp: new Date().toISOString(),
+          },
         },
-      },
-    });
+      }),
+      ...(!hasActiveSubscription
+        ? [
+            db.user.update({
+              where: { id: session.user.id },
+              data: { atsGenerationCount: { increment: 1 } },
+            }),
+          ]
+        : []),
+    ]);
 
     return NextResponse.json({
       success: true,
