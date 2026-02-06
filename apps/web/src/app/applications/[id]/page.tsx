@@ -11,18 +11,29 @@ import {
   FileText,
   Download,
   ChevronDown,
+  ChevronUp,
   Building2,
   DollarSign,
-  Pencil,
   Trash2,
   Check,
   Upload,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ResumePreviewToggle } from "@/components/ResumeViewer";
 import {
   ApplicationStatus,
   APPLICATION_STATUS_LABELS,
+  type ResumeData,
 } from "@shared/types";
+
+interface ResumeVersion {
+  id: string;
+  content: ResumeData;
+  keywords: string[];
+  createdAt: string;
+  baseResume: { name: string } | null;
+}
 
 interface ApplicationDetail {
   id: string;
@@ -45,6 +56,7 @@ interface ApplicationDetail {
   finalResumeUploadedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  resumeVersions: ResumeVersion[];
   contacts: {
     id: string;
     name: string;
@@ -79,6 +91,13 @@ const STATUS_OPTIONS: ApplicationStatus[] = [
   "withdrawn",
 ];
 
+function formatFileSize(bytes: number | null | undefined): string | null {
+  if (!bytes) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function ApplicationDetailPage({
   params,
 }: {
@@ -92,13 +111,19 @@ export default function ApplicationDetailPage({
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "contacts">("overview");
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "resume" | "contacts">("overview");
   const finalResumeInputRef = useRef<HTMLInputElement>(null);
   const [finalResumeUploading, setFinalResumeUploading] = useState(false);
   const [finalResumeError, setFinalResumeError] = useState("");
 
   // For setting/changing resume used
-  const [baseResumes, setBaseResumes] = useState<{ id: string; name: string }[]>([]);
+  const [baseResumes, setBaseResumes] = useState<{
+    id: string;
+    name: string;
+    fileName: string | null;
+    fileType: string | null;
+  }[]>([]);
   const [selectedBaseResumeId, setSelectedBaseResumeId] = useState<string>("");
 
   useEffect(() => {
@@ -111,7 +136,14 @@ export default function ApplicationDetailPage({
       const res = await fetch("/api/resumes");
       const data = await res.json();
       if (data.success) {
-        setBaseResumes(data.data.map((r: { id: string; name: string }) => ({ id: r.id, name: r.name })));
+        setBaseResumes(
+          data.data.map((r: { id: string; name: string; fileName: string | null; fileType: string | null }) => ({
+            id: r.id,
+            name: r.name,
+            fileName: r.fileName ?? null,
+            fileType: r.fileType ?? null,
+          }))
+        );
       }
     } catch (err) {
       console.error("Failed to fetch base resumes:", err);
@@ -206,7 +238,6 @@ export default function ApplicationDetailPage({
       if (res.ok) {
         // Refresh to get updated data with resume name
         await fetchApplication();
-        setEditingResumeUsed(false);
       }
     } catch (err) {
       console.error("Failed to save resume used:", err);
@@ -282,6 +313,26 @@ export default function ApplicationDetailPage({
 
   const statusLower = application.status.toLowerCase();
   const hasUrl = Boolean(application.url);
+  const description = application.description ?? "";
+  const isLongDescription = description.length > 500;
+  const shownDescription = isLongDescription && !showFullDescription
+    ? `${description.slice(0, 500).trimEnd()}…`
+    : description;
+  const resumeViewUrl = application.finalResumeFileName
+    ? `/api/applications/${application.id}/final-resume`
+    : application.appliedWithResume
+      ? `/api/resumes/${application.appliedWithResume.id}/file`
+      : null;
+  const resumeTitle = application.finalResumeFileName || application.appliedWithResume?.name || null;
+  const appliedBaseResume = application.appliedWithResume
+    ? baseResumes.find((resume) => resume.id === application.appliedWithResume?.id)
+    : null;
+  const resumeFileType = application.finalResumeFileType ?? appliedBaseResume?.fileType ?? null;
+  const resumeFileName = application.finalResumeFileName ?? appliedBaseResume?.fileName ?? null;
+  const resumeSize = formatFileSize(application.finalResumeFileSize);
+  const resumeUploadedAt = application.finalResumeUploadedAt
+    ? new Date(application.finalResumeUploadedAt).toLocaleDateString()
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -375,7 +426,7 @@ export default function ApplicationDetailPage({
           <div className="lg:col-span-2 space-y-6">
             {/* Tabs */}
             <div className="flex border-b">
-              {(["overview", "contacts"] as const).map((tab) => (
+              {(["overview", "resume", "contacts"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -387,6 +438,7 @@ export default function ApplicationDetailPage({
                   )}
                 >
                   {tab === "overview" && "Overview"}
+                  {tab === "resume" && "Resume"}
                   {tab === "contacts" && `Contacts (${application.contacts.length})`}
                 </button>
               ))}
@@ -395,57 +447,234 @@ export default function ApplicationDetailPage({
             {/* Overview Tab */}
             {activeTab === "overview" && (
               <div className="space-y-6">
-                {/* Resume Used */}
-                <div className="bg-card border rounded-lg p-6 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Resume Used</h3>
-                    {application.finalResumeFileName ? (
-                      <a
-                        href={`/api/applications/${application.id}/final-resume`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        View
-                      </a>
-                    ) : application.appliedWithResume ? (
-                      <a
-                        href={`/api/resumes/${application.appliedWithResume.id}/file`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline"
-                      >
-                        View
-                      </a>
-                    ) : null}
+                {/* Job Summary */}
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <h2 className="text-2xl font-semibold">{application.title}</h2>
+                      <p className="text-muted-foreground">{application.companyName}</p>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2 text-sm">
+                      {application.location && (
+                        <div className="flex items-start gap-3">
+                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Location</p>
+                            <p>{application.location}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {application.salary && (
+                        <div className="flex items-start gap-3">
+                          <DollarSign className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Salary</p>
+                            <p>{application.salary}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {application.source && (
+                        <div className="flex items-start gap-3">
+                          <Building2 className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Source</p>
+                            <p>{application.source}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Date added</p>
+                          <p>{new Date(application.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      {application.appliedAt && (
+                        <div className="flex items-start gap-3">
+                          <Check className="w-4 h-4 text-green-600 mt-0.5" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Date applied</p>
+                            <p>{new Date(application.appliedAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-3">
+                        <FileText className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Resume used</p>
+                          {resumeTitle ? (
+                            <div className="flex items-center gap-2">
+                              <span>{resumeTitle}</span>
+                              {resumeViewUrl && (
+                                <a
+                                  href={resumeViewUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  View
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground">Not recorded</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {hasUrl && application.url && (
+                        <div className="flex items-start gap-3">
+                          <ExternalLink className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Job posting</p>
+                            <a
+                              href={application.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              View posting
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    This should match the resume you actually submitted for this job.
-                  </p>
-                  {application.finalResumeFileName && (
-                    <div className="text-sm text-muted-foreground">
-                      Uploaded: {application.finalResumeFileName}
+                </div>
+
+                {/* Job Description */}
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold">Job Description</h2>
+                    {isLongDescription && (
+                      <button
+                        type="button"
+                        onClick={() => setShowFullDescription((prev) => !prev)}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                      >
+                        {showFullDescription ? "Show less" : "Show more"}
+                        {showFullDescription ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {application.description ? (
+                    <div className="prose prose-sm max-w-none">
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+                        {shownDescription}
+                      </pre>
                     </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No job description provided.</p>
                   )}
-                  {application.finalResumeUploadedAt && (
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(application.finalResumeUploadedAt).toLocaleDateString()}
+                </div>
+
+                {/* Notes */}
+                <div className="bg-card border rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold">Notes</h2>
+                    {!editingNotes && (
+                      <button
+                        onClick={() => setEditingNotes(true)}
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+
+                  {editingNotes ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={4}
+                        placeholder="Add notes about this application..."
+                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveNotes}
+                          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setNotes(application.notes || "");
+                            setEditingNotes(false);
+                          }}
+                          className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-muted"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
+                  ) : application.notes ? (
+                    <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">No notes yet. Click edit to add some.</p>
                   )}
-                  {!application.finalResumeFileName && application.appliedWithResume && (
-                    <div className="text-sm text-muted-foreground">
-                      Selected resume: {application.appliedWithResume.name}
+                </div>
+              </div>
+            )}
+
+            {/* Resume Tab */}
+            {activeTab === "resume" && (
+              <div className="space-y-6">
+                {/* Resume Used */}
+                <div className="bg-card border rounded-lg p-6 space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-lg">Resume Used</h3>
+                    <p className="text-sm text-muted-foreground">
+                      This should match the resume you actually submitted for this job.
+                    </p>
+                  </div>
+
+                  {resumeTitle ? (
+                    <div className="space-y-4">
+                      <div className="text-xl font-semibold">{resumeTitle}</div>
+
+                      {application.finalResumeFileName ? (
+                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                          {resumeSize && <span>{resumeSize}</span>}
+                          {resumeUploadedAt && <span>Uploaded {resumeUploadedAt}</span>}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Saved resume selection
+                        </div>
+                      )}
+
+                      {resumeViewUrl && (
+                        <ResumePreviewToggle
+                          src={resumeViewUrl}
+                          fileType={resumeFileType}
+                          fileName={resumeFileName}
+                          label="Preview"
+                          downloadUrl={resumeViewUrl}
+                        />
+                      )}
                     </div>
-                  )}
-                  {!application.finalResumeFileName && !application.appliedWithResume && (
-                    <div className="text-sm text-muted-foreground">
-                      No resume recorded yet.
+                  ) : (
+                    <div className="border border-dashed rounded-lg p-4 text-sm text-muted-foreground">
+                      No resume recorded yet. Select a saved resume or upload the final file below.
                     </div>
                   )}
                 </div>
 
                 {/* Replace Resume */}
-                <div className="bg-card border rounded-lg p-6 space-y-4">
+                <div className="bg-card border rounded-lg p-6 space-y-5">
                   <div>
                     <h3 className="font-semibold">Replace Resume</h3>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -513,69 +742,6 @@ export default function ApplicationDetailPage({
                       </p>
                     )}
                   </div>
-                </div>
-
-                {/* Job Description */}
-                <div className="bg-card border rounded-lg p-6">
-                  <h2 className="font-semibold mb-4">Job Description</h2>
-                  {application.description ? (
-                    <div className="prose prose-sm max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
-                        {application.description}
-                      </pre>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No job description provided.</p>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold">Notes</h2>
-                    {!editingNotes && (
-                      <button
-                        onClick={() => setEditingNotes(true)}
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {editingNotes ? (
-                    <div className="space-y-3">
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={4}
-                        placeholder="Add notes about this application..."
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveNotes}
-                          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setNotes(application.notes || "");
-                            setEditingNotes(false);
-                          }}
-                          className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-muted"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : application.notes ? (
-                    <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No notes yet. Click edit to add some.</p>
-                  )}
                 </div>
               </div>
             )}
@@ -669,17 +835,6 @@ export default function ApplicationDetailPage({
                   </div>
                 )}
 
-                {application.finalResumeFileName ? (
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span>Resume: {application.finalResumeFileName}</span>
-                  </div>
-                ) : application.appliedWithResume ? (
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span>Resume: {application.appliedWithResume.name}</span>
-                  </div>
-                ) : null}
               </div>
             </div>
 
@@ -699,9 +854,9 @@ export default function ApplicationDetailPage({
                 </a>
               )}
 
-              {application.finalResumeFileName ? (
+              {resumeViewUrl && (
                 <a
-                  href={`/api/applications/${application.id}/final-resume`}
+                  href={resumeViewUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
@@ -709,17 +864,7 @@ export default function ApplicationDetailPage({
                   <Download className="w-4 h-4" />
                   View Resume
                 </a>
-              ) : application.appliedWithResume ? (
-                <a
-                  href={`/api/resumes/${application.appliedWithResume.id}/file`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  View Resume
-                </a>
-              ) : null}
+              )}
 
               {statusLower === "saved" && (
                 <button
