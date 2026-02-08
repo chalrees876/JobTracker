@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const updateResumeSchema = z.object({
+  name: z.string().min(1).optional(),
+  content: z.record(z.unknown()).optional(),
+  isDefault: z.boolean().optional(),
+}).strict();
 
 // GET /api/resumes/[id] - Get a specific resume
 export async function GET(
@@ -15,6 +23,9 @@ export async function GET(
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const { id } = await params;
 
@@ -56,8 +67,19 @@ export async function PATCH(
       );
     }
 
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
+
     const { id } = await params;
     const body = await request.json();
+
+    const parsed = updateResumeSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
 
     // Verify ownership
     const existing = await db.baseResume.findFirst({
@@ -75,7 +97,7 @@ export async function PATCH(
       );
     }
 
-    const { name, content, isDefault } = body;
+    const { name, content, isDefault } = parsed.data;
 
     // If setting as default, unset others
     if (isDefault) {
@@ -117,6 +139,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const { id } = await params;
 

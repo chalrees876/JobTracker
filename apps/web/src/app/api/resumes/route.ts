@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const createResumeSchema = z.object({
@@ -51,6 +52,9 @@ export async function GET() {
       );
     }
 
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
+
     const profile = await db.userProfile.findUnique({
       where: { userId: session.user.id },
     });
@@ -84,6 +88,9 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const body = await request.json();
     const parsed = createResumeSchema.safeParse(body);

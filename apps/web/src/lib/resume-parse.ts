@@ -3,6 +3,7 @@ import { generateObject } from "ai";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { unlink, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
@@ -69,7 +70,7 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   const cliPath = resolvePdfParseCli();
 
   // Create temp file for pdf-parse CLI (always cleanup after)
-  const tempDir = path.join(process.cwd(), "uploads", "tmp");
+  const tempDir = path.join(tmpdir(), "jobtracker-pdf-parse");
   await mkdir(tempDir, { recursive: true });
   const tempPath = path.join(tempDir, `${randomUUID()}.pdf`);
   await writeFile(tempPath, buffer);

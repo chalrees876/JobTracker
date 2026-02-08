@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const updateApplicationSchema = z.object({
+  status: z.string().optional(),
+  notes: z.string().nullable().optional(),
+  appliedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  appliedWithResumeId: z.string().nullable().optional(),
+}).strict();
 
 // GET /api/applications/[id] - Get single application
 export async function GET(
@@ -15,6 +24,9 @@ export async function GET(
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const { id } = await params;
 
@@ -88,8 +100,19 @@ export async function PATCH(
       );
     }
 
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
+
     const { id } = await params;
     const body = await request.json();
+
+    const parsed = updateApplicationSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
 
     // Verify ownership
     const existing = await db.application.findFirst({
@@ -103,14 +126,14 @@ export async function PATCH(
       );
     }
 
-    const { status, notes, appliedAt, appliedWithResumeId } = body;
+    const { status, notes, appliedAt, appliedWithResumeId } = parsed.data;
 
     const application = await db.application.update({
       where: { id },
       data: {
         ...(status !== undefined && { status }),
         ...(notes !== undefined && { notes }),
-        ...(appliedAt !== undefined && { appliedAt: new Date(appliedAt) }),
+        ...(appliedAt !== undefined && { appliedAt: appliedAt ? new Date(appliedAt) : null }),
         ...(appliedWithResumeId !== undefined && { appliedWithResumeId }),
       },
     });
@@ -138,6 +161,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const { id } = await params;
 

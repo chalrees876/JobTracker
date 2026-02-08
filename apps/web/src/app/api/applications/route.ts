@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { createApplicationSchema } from "@shared/types";
 import crypto from "crypto";
+
+const VALID_STATUSES = new Set(["SAVED", "APPLIED", "PHONE_SCREEN", "INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN"]);
 
 // GET /api/applications - List all applications
 export async function GET(request: NextRequest) {
@@ -15,6 +18,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
+
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
     const page = parseInt(searchParams.get("page") ?? "1");
@@ -22,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const where = {
       userId: session.user.id,
-      ...(status ? { status: status as any } : {}),
+      ...(status && VALID_STATUSES.has(status.toUpperCase()) ? { status: status.toUpperCase() as any } : {}),
     };
 
     const [applications, total] = await Promise.all([
@@ -74,6 +80,9 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const body = await request.json();
     const parsed = createApplicationSchema.safeParse(body);

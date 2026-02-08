@@ -19,7 +19,7 @@ import {
   Upload,
   Pencil,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import { ResumePreviewToggle } from "@/components/ResumeViewer";
 import {
   ApplicationStatus,
@@ -66,8 +66,12 @@ interface ApplicationDetail {
   }[];
   companyInfo: {
     id: string;
-    missionStatement: string | null;
-    recentNews: string[];
+    summary: string | null;
+    product: string | null;
+    industry: string | null;
+    size: string | null;
+    talkingPoints: string[];
+    interviewPrep: string[];
   } | null;
 }
 
@@ -91,12 +95,6 @@ const STATUS_OPTIONS: ApplicationStatus[] = [
   "withdrawn",
 ];
 
-function formatFileSize(bytes: number | null | undefined): string | null {
-  if (!bytes) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export default function ApplicationDetailPage({
   params,
@@ -292,6 +290,7 @@ export default function ApplicationDetailPage({
             <Link
               href="/applications"
               className="p-2 hover:bg-muted rounded-lg transition-colors"
+              aria-label="Go back"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -344,6 +343,7 @@ export default function ApplicationDetailPage({
               <Link
                 href="/applications"
                 className="p-2 hover:bg-muted rounded-lg transition-colors"
+                aria-label="Go back"
               >
                 <ArrowLeft className="w-5 h-5" />
               </Link>
@@ -402,6 +402,7 @@ export default function ApplicationDetailPage({
                   rel="noopener noreferrer"
                   className="p-2 hover:bg-muted rounded-lg transition-colors"
                   title="View Job Posting"
+                  aria-label="View Job Posting"
                 >
                   <ExternalLink className="w-5 h-5" />
                 </a>
@@ -412,6 +413,7 @@ export default function ApplicationDetailPage({
                 onClick={deleteApplication}
                 className="p-2 hover:bg-destructive/10 rounded-lg transition-colors text-destructive"
                 title="Delete Application"
+                aria-label="Delete Application"
               >
                 <Trash2 className="w-5 h-5" />
               </button>

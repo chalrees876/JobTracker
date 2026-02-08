@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.14.0",
     "@ai-sdk/openai": "^1.0.0",
     "@auth/prisma-adapter": "^2.11.1",
+    "@google-cloud/storage": "^7.14.0",
     "@prisma/client": "^6.3.1",
     "@shared/types": "workspace:*",
     "ai": "^4.1.0",
@@ -23,6 +23,7 @@
     "pdf-parse": "^2.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "stripe": "^20.3.1",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.1"
   },

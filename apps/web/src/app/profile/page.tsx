@@ -13,6 +13,7 @@ import {
   File,
   Loader2,
 } from "lucide-react";
+import { formatFileSize } from "@/lib/utils";
 
 interface BaseResume {
   id: string;
@@ -29,13 +30,6 @@ interface Profile {
   headline: string | null;
   onboardingComplete: boolean;
   baseResumes: BaseResume[];
-}
-
-function formatFileSize(bytes: number | null): string {
-  if (!bytes) return "Unknown size";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getFileIcon(fileType: string | null): string {
@@ -307,7 +301,7 @@ function ResumeCard({
             {resume.fileName || "No file"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {formatFileSize(resume.fileSize)} •{" "}
+            {formatFileSize(resume.fileSize) ?? "Unknown size"} •{" "}
             {new Date(resume.createdAt).toLocaleDateString()}
           </p>
         </div>
@@ -320,6 +314,7 @@ function ResumeCard({
                 onClick={handleView}
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                 title="View"
+                aria-label="View"
               >
                 <FileText className="w-4 h-4" />
               </button>
@@ -327,6 +322,7 @@ function ResumeCard({
                 onClick={handleDownload}
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                 title="Download"
+                aria-label="Download"
               >
                 <Download className="w-4 h-4" />
               </button>
@@ -337,6 +333,7 @@ function ResumeCard({
               onClick={onSetDefault}
               className="p-2 text-muted-foreground hover:text-primary hover:bg-muted rounded transition-colors"
               title="Set as default"
+              aria-label="Set as default"
             >
               <Star className="w-4 h-4" />
             </button>
@@ -345,6 +342,7 @@ function ResumeCard({
             onClick={onDelete}
             className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
             title="Delete"
+            aria-label="Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>

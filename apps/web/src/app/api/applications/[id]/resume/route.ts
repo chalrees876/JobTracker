@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { rateLimit, STRICT_LIMIT } from "@/lib/rate-limit";
+import { checkUsage } from "@/lib/usage";
 import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -124,6 +126,24 @@ export async function POST(
       );
     }
 
+    const limited = rateLimit(session.user.id, STRICT_LIMIT);
+    if (limited) return limited;
+
+    // Check usage limits (free: 2 lifetime, paid: 50/month)
+    const usage = await checkUsage(session.user.id);
+    if (!usage.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "generation_limit_reached",
+          used: usage.used,
+          limit: usage.limit,
+          isPaid: usage.isPaid,
+        },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const { baseResumeId } = body;
@@ -218,6 +238,9 @@ Return JSON that matches the schema exactly.`;
           ? ""
           : "\n\nRETRY STRICTLY: Keep company/title/dates/location and project names identical and in the same order. Do not add new skills. Keep bullet counts the same or fewer. Include at least 50% of extracted keywords in the rewritten content.";
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60_000);
+
       const { object } = await generateObject({
         model: openai("gpt-4o-2024-08-06", { structuredOutputs: true }),
         schemaName: "tailored_resume",
@@ -225,7 +248,10 @@ Return JSON that matches the schema exactly.`;
         schema: tailoredResumeSchema,
         temperature: 0.2,
         prompt: `${promptBase}${retryNote}`,
+        abortSignal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       const error = validateTailored(baseResume, object);
       if (!error) {
@@ -306,6 +332,9 @@ export async function GET(
         { status: 401 }
       );
     }
+
+    const limited = rateLimit(session.user.id);
+    if (limited) return limited;
 
     const { id } = await params;
 
