@@ -72,16 +72,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename and storage key
-    const uniqueId = randomUUID();
-    const fileName = `${uniqueId}${ext}`;
-    const storageKey = `${session.user.id}/${fileName}`;
-
-    // Upload file to storage (GCS or local)
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const contentType = file.type || `application/${ext.slice(1)}`;
-    await storage.upload(storageKey, buffer, contentType);
 
     let parsedContent: ResumeData | null = null;
     if (ext === ".pdf") {
@@ -107,6 +101,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate unique filename and storage key
+    const uniqueId = randomUUID();
+    const fileName = `${uniqueId}${ext}`;
+    const storageKey = `${session.user.id}/${fileName}`;
+
+    // Upload file to storage (GCS or local)
+    await storage.upload(storageKey, buffer, contentType);
+
     // Check if this is the first resume (make it default)
     const existingResumes = await db.baseResume.count({
       where: { profileId: profile.id },
@@ -114,18 +116,24 @@ export async function POST(request: NextRequest) {
     const isDefault = existingResumes === 0;
 
     // Create database record
-    const baseResume = await db.baseResume.create({
-      data: {
-        profileId: profile.id,
-        name: name || file.name.replace(/\.[^/.]+$/, ""), // Use provided name or filename without extension
-        fileName: file.name,
-        fileType: contentType,
-        fileSize: file.size,
-        filePath: storageKey, // Storage key (works for both GCS and local)
-        isDefault,
-        content: (parsedContent ?? undefined) as Prisma.InputJsonValue | undefined,
-      },
-    });
+    let baseResume;
+    try {
+      baseResume = await db.baseResume.create({
+        data: {
+          profileId: profile.id,
+          name: name || file.name.replace(/\.[^/.]+$/, ""), // Use provided name or filename without extension
+          fileName: file.name,
+          fileType: contentType,
+          fileSize: file.size,
+          filePath: storageKey, // Storage key (works for both GCS and local)
+          isDefault,
+          content: (parsedContent ?? undefined) as Prisma.InputJsonValue | undefined,
+        },
+      });
+    } catch (error) {
+      await storage.delete(storageKey).catch(() => undefined);
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
@@ -136,6 +144,7 @@ export async function POST(request: NextRequest) {
         fileType: baseResume.fileType,
         fileSize: baseResume.fileSize,
         isDefault: baseResume.isDefault,
+        content: baseResume.content,
         createdAt: baseResume.createdAt,
       },
     });
